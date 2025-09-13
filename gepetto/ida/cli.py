@@ -20,6 +20,21 @@ import gepetto.ida.tools.search
 import gepetto.ida.tools.to_hex
 import gepetto.ida.tools.get_disasm
 import gepetto.ida.tools.get_bytes
+import gepetto.ida.tools.metadata
+import gepetto.ida.tools.functions_info
+import gepetto.ida.tools.numbers
+import gepetto.ida.tools.globals_and_imports
+import gepetto.ida.tools.types_and_structures
+import gepetto.ida.tools.disassemble_function
+import gepetto.ida.tools.decompile_function
+import gepetto.ida.tools.xrefs2
+import gepetto.ida.tools.comments
+import gepetto.ida.tools.locals_and_types
+import gepetto.ida.tools.stack_frame
+import gepetto.ida.tools.memory
+import gepetto.ida.tools.patching
+import gepetto.ida.tools.prototypes
+import gepetto.ida.tools.debugger
 
 _ = gepetto.config._
 CLI: ida_kernwin.cli_t = None
@@ -247,14 +262,60 @@ class GepettoCLI(ida_kernwin.cli_t):
                         gepetto.ida.tools.get_ea.handle_get_ea_tc(tc, MESSAGES)
                     elif tc.function.name == "get_function_code":
                         gepetto.ida.tools.get_function_code.handle_get_function_code_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_metadata":
+                        gepetto.ida.tools.metadata.handle_get_metadata_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_function_by_name":
+                        gepetto.ida.tools.functions_info.handle_get_function_by_name_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_function_by_address":
+                        gepetto.ida.tools.functions_info.handle_get_function_by_address_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_current_address":
+                        gepetto.ida.tools.functions_info.handle_get_current_address_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_current_function":
+                        gepetto.ida.tools.functions_info.handle_get_current_function_tc(tc, MESSAGES)
+                    elif tc.function.name == "convert_number":
+                        gepetto.ida.tools.numbers.handle_convert_number_tc(tc, MESSAGES)
+                    elif tc.function.name == "list_functions":
+                        gepetto.ida.tools.functions_info.handle_list_functions_tc(tc, MESSAGES)
+                    elif tc.function.name == "list_globals":
+                        gepetto.ida.tools.globals_and_imports.handle_list_globals_tc(tc, MESSAGES)
+                    elif tc.function.name == "list_globals_filter":
+                        gepetto.ida.tools.globals_and_imports.handle_list_globals_filter_tc(tc, MESSAGES)
+                    elif tc.function.name == "list_imports":
+                        gepetto.ida.tools.globals_and_imports.handle_list_imports_tc(tc, MESSAGES)
+                    elif tc.function.name == "list_local_types":
+                        gepetto.ida.tools.types_and_structures.handle_list_local_types_tc(tc, MESSAGES)
+                    elif tc.function.name == "declare_c_type":
+                        gepetto.ida.tools.types_and_structures.handle_declare_c_type_tc(tc, MESSAGES)
+                    elif tc.function.name == "disassemble_function":
+                        gepetto.ida.tools.disassemble_function.handle_disassemble_function_tc(tc, MESSAGES)
+                    elif tc.function.name == "decompile_function":
+                        gepetto.ida.tools.decompile_function.handle_decompile_function_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_xrefs_to":
+                        gepetto.ida.tools.xrefs2.handle_get_xrefs_to_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_xrefs_to_field":
+                        gepetto.ida.tools.xrefs2.handle_get_xrefs_to_field_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_entry_points":
+                        gepetto.ida.tools.functions_info.handle_get_entry_points_tc(tc, MESSAGES)
+                    elif tc.function.name == "set_comment":
+                        gepetto.ida.tools.comments.handle_set_comment_tc(tc, MESSAGES)
                     elif tc.function.name == "rename_lvar":
                         gepetto.ida.tools.rename_lvar.handle_rename_lvar_tc(tc, MESSAGES)
+                    elif tc.function.name == "rename_local_variable":
+                        gepetto.ida.tools.locals_and_types.handle_rename_local_variable_tc(tc, MESSAGES)
                     elif tc.function.name == "rename_function":
                         gepetto.ida.tools.rename_function.handle_rename_function_tc(tc, MESSAGES)
+                    elif tc.function.name == "rename_global_variable":
+                        gepetto.ida.tools.globals_and_imports.handle_rename_global_variable_tc(tc, MESSAGES)
+                    elif tc.function.name == "set_function_prototype":
+                        gepetto.ida.tools.prototypes.handle_set_function_prototype_tc(tc, MESSAGES)
+                    elif tc.function.name == "set_local_variable_type":
+                        gepetto.ida.tools.locals_and_types.handle_set_local_variable_type_tc(tc, MESSAGES)
                     elif tc.function.name == "get_xrefs":
                         gepetto.ida.tools.get_xrefs.handle_get_xrefs_tc(tc, MESSAGES)
                     elif tc.function.name == "list_symbols":
                         gepetto.ida.tools.list_symbols.handle_list_symbols_tc(tc, MESSAGES)
+                    elif tc.function.name == "list_strings_filter":
+                        gepetto.ida.tools.search.handle_list_strings_filter_tc(tc, MESSAGES)
                     elif tc.function.name == "list_strings":
                         gepetto.ida.tools.search.handle_list_strings_tc(tc, MESSAGES)
                     elif tc.function.name == "search":
@@ -271,6 +332,66 @@ class GepettoCLI(ida_kernwin.cli_t):
                         gepetto.ida.tools.call_graph.handle_get_callees_tc(tc, MESSAGES)
                     elif tc.function.name == "refresh_view":
                         gepetto.ida.tools.refresh_view.handle_refresh_view_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_stack_frame_variables":
+                        gepetto.ida.tools.stack_frame.handle_get_stack_frame_variables_tc(tc, MESSAGES)
+                    elif tc.function.name == "rename_stack_frame_variable":
+                        gepetto.ida.tools.stack_frame.handle_rename_stack_frame_variable_tc(tc, MESSAGES)
+                    elif tc.function.name == "create_stack_frame_variable":
+                        gepetto.ida.tools.stack_frame.handle_create_stack_frame_variable_tc(tc, MESSAGES)
+                    elif tc.function.name == "set_stack_frame_variable_type":
+                        gepetto.ida.tools.stack_frame.handle_set_stack_frame_variable_type_tc(tc, MESSAGES)
+                    elif tc.function.name == "delete_stack_frame_variable":
+                        gepetto.ida.tools.stack_frame.handle_delete_stack_frame_variable_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_defined_structures":
+                        gepetto.ida.tools.types_and_structures.handle_get_defined_structures_tc(tc, MESSAGES)
+                    elif tc.function.name == "analyze_struct_detailed":
+                        gepetto.ida.tools.types_and_structures.handle_analyze_struct_detailed_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_struct_at_address":
+                        gepetto.ida.tools.types_and_structures.handle_get_struct_at_address_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_struct_info_simple":
+                        gepetto.ida.tools.types_and_structures.handle_get_struct_info_simple_tc(tc, MESSAGES)
+                    elif tc.function.name == "search_structures":
+                        gepetto.ida.tools.types_and_structures.handle_search_structures_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_global_variable_value_by_name":
+                        gepetto.ida.tools.globals_and_imports.handle_get_global_variable_value_by_name_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_global_variable_value_at_address":
+                        gepetto.ida.tools.globals_and_imports.handle_get_global_variable_value_at_address_tc(tc, MESSAGES)
+                    elif tc.function.name == "set_global_variable_type":
+                        gepetto.ida.tools.globals_and_imports.handle_set_global_variable_type_tc(tc, MESSAGES)
+                    elif tc.function.name == "read_memory_bytes":
+                        gepetto.ida.tools.memory.handle_read_memory_bytes_tc(tc, MESSAGES)
+                    elif tc.function.name == "data_read_byte":
+                        gepetto.ida.tools.memory.handle_data_read_byte_tc(tc, MESSAGES)
+                    elif tc.function.name == "data_read_word":
+                        gepetto.ida.tools.memory.handle_data_read_word_tc(tc, MESSAGES)
+                    elif tc.function.name == "data_read_dword":
+                        gepetto.ida.tools.memory.handle_data_read_dword_tc(tc, MESSAGES)
+                    elif tc.function.name == "data_read_qword":
+                        gepetto.ida.tools.memory.handle_data_read_qword_tc(tc, MESSAGES)
+                    elif tc.function.name == "data_read_string":
+                        gepetto.ida.tools.memory.handle_data_read_string_tc(tc, MESSAGES)
+                    elif tc.function.name == "patch_address_assembles":
+                        gepetto.ida.tools.patching.handle_patch_address_assembles_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_get_registers":
+                        gepetto.ida.tools.debugger.handle_dbg_get_registers_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_get_call_stack":
+                        gepetto.ida.tools.debugger.handle_dbg_get_call_stack_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_list_breakpoints":
+                        gepetto.ida.tools.debugger.handle_dbg_list_breakpoints_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_start_process":
+                        gepetto.ida.tools.debugger.handle_dbg_start_process_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_exit_process":
+                        gepetto.ida.tools.debugger.handle_dbg_exit_process_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_continue_process":
+                        gepetto.ida.tools.debugger.handle_dbg_continue_process_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_run_to":
+                        gepetto.ida.tools.debugger.handle_dbg_run_to_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_set_breakpoint":
+                        gepetto.ida.tools.debugger.handle_dbg_set_breakpoint_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_delete_breakpoint":
+                        gepetto.ida.tools.debugger.handle_dbg_delete_breakpoint_tc(tc, MESSAGES)
+                    elif tc.function.name == "dbg_enable_breakpoint":
+                        gepetto.ida.tools.debugger.handle_dbg_enable_breakpoint_tc(tc, MESSAGES)
                 STATUS.end_stream()
                 if getattr(STATUS, "_stopped", False):
                     return

@@ -72,6 +72,26 @@ def handle_list_strings_tc(tc, messages):
     add_result_to_messages(messages, tc, result)
 
 # -----------------------------------------------------------------------------
+
+def handle_list_strings_filter_tc(tc, messages):
+    """Handler for the 'list_strings_filter' tool (MCP parity)."""
+    try:
+        args = json.loads(getattr(tc.function, "arguments", "") or "{}")
+    except Exception:
+        args = {}
+
+    try:
+        result = list_strings_filter(
+            offset=int(args.get("offset", 0)),
+            count=int(args.get("count", 100)),
+            filter_text=str(args.get("filter", "")),
+        )
+    except Exception as ex:
+        result = {"ok": False, "error": str(ex)}
+
+    add_result_to_messages(messages, tc, result)
+
+# -----------------------------------------------------------------------------
 # Shared snapshot utilities
 # -----------------------------------------------------------------------------
 
@@ -308,3 +328,57 @@ def list_strings(
     out["items"] = results
     out["ok"] = True
     return out
+
+# -----------------------------------------------------------------------------
+
+def _compile_filter(pattern: str):
+    """Return (callable) predicate for matching string text.
+
+    - '/regex/' => treat as regex; optional trailing '/i' enables IGNORECASE
+    - otherwise: case-insensitive substring match
+    """
+    if isinstance(pattern, str) and len(pattern) >= 2 and pattern.startswith('/'):
+        last = pattern.rfind('/')
+        if last > 0:
+            body = pattern[1:last]
+            flags = pattern[last+1:].lower()
+            import re
+            re_flags = re.IGNORECASE if 'i' in flags else 0
+            try:
+                rx = re.compile(body, re_flags)
+                return lambda s: bool(rx.search(s or ""))
+            except Exception:
+                pass
+    q = (pattern or "").casefold()
+    return lambda s: q in (s or "").casefold()
+
+
+def list_strings_filter(offset: int, count: int, filter_text: str) -> dict:
+    """
+    MCP-parity helper: list strings with a simple filter and pagination.
+
+    Returns: { ok, data: [ {address, length, string} ], next_offset }
+    """
+    snap = _ui_snapshot_wrapper()
+    items = snap.get("strings", [])
+
+    pred = _compile_filter(filter_text or "")
+    rows = []
+    for x in items:
+        t = x.get("text") or ""
+        if pred(t):
+            rows.append({
+                "address": f"{int(x['ea']):#x}",
+                "length": int(x.get("len", len(t))),
+                "string": t,
+            })
+
+    total = len(rows)
+    if count == 0:
+        end = total
+    else:
+        end = min(total, max(0, offset) + max(0, count))
+    page = rows[offset:end]
+    next_offset = end if end < total else None
+
+    return {"ok": True, "data": page, "next_offset": next_offset}
