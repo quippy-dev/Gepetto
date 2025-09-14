@@ -9,6 +9,7 @@ import ida_name
 import ida_xref
 
 from gepetto.ida.tools.function_utils import parse_ea, resolve_ea, resolve_func, get_func_name
+from gepetto.ida.utils.ida9_utils import touch_last_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 
 def handle_get_xrefs_tc(tc, messages):
@@ -156,6 +157,7 @@ def get_xrefs_unified(
 
             subj_name = _ea_func_name(target_ea) if enrich_names else None
             out["subject"] = {"ea": int(target_ea), "name": subj_name or "", "kind": subject_kind}
+            touch_last_ea(target_ea)
 
             # Build list of items to scan
             items: Iterable[int]

@@ -6,6 +6,7 @@ import ida_kernwin
 
 from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import touch_last_ea
 
 
 def handle_get_bytes_tc(tc, messages):
@@ -19,6 +20,7 @@ def handle_get_bytes_tc(tc, messages):
     size = args.get("size", 0x20)
     try:
         ea = parse_ea(ea)
+        touch_last_ea(ea)
         size = int(size)
         result = get_bytes(ea, size)
     except Exception as ex:
@@ -62,6 +64,7 @@ def get_bytes(ea: int, size: int = 0x20) -> Dict:
     }
 
     try:
+        touch_last_ea(ea)
         bs = _read_bytes(ea, size)
         result.update(ok=True, bytes=_format_bytes(bs))
     except Exception as e:

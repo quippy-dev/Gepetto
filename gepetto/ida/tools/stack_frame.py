@@ -1,12 +1,17 @@
 import json
 
 import ida_frame
+import ida_funcs
 import ida_kernwin
+import ida_struct
 import ida_typeinf
 import idaapi
 
-from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import (
+    parse_ea, run_on_main_thread, hexrays_available, decompile_func,
+    parse_type_declaration, validate_function_ea, ea_to_hex, touch_last_ea
+)
 
 
 def handle_get_stack_frame_variables_tc(tc, messages):
@@ -79,11 +84,11 @@ def _frame_tinfo(func) -> ida_typeinf.tinfo_t:
 
 
 def get_stack_frame_variables(function_address: str) -> list[dict]:
-    # Enhanced error handling and thread safety
+    """Get stack frame variables with enhanced error handling and thread safety."""
     try:
-        func = idaapi.get_func(parse_ea(function_address))
-        if not func:
-            raise ValueError(f"No function found at address {function_address}")
+        ea = parse_ea(function_address)
+        touch_last_ea(ea)
+        func = validate_function_ea(ea)
         
         result = {"members": [], "error": None}
         
@@ -127,7 +132,7 @@ def get_stack_frame_variables(function_address: str) -> list[dict]:
                             offset = udm.offset // 8
                             size = udm.size // 8
                             typ = str(udm.type)
-                            members.append({"name": name, "offset": hex(offset), "size": hex(size), "type": typ})
+                            members.append({"name": name, "offset": ea_to_hex(offset), "size": ea_to_hex(size), "type": typ})
                     except Exception:
                         continue
                         
@@ -138,8 +143,8 @@ def get_stack_frame_variables(function_address: str) -> list[dict]:
                 result["members"] = []
                 return 0
         
-        # Use MFF_FAST instead of MFF_READ for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread for read operations
+        if not run_on_main_thread(_do, write=False):
             if result["error"]:
                 raise ValueError(f"Failed to get stack frame variables: {result['error']}")
             
@@ -152,33 +157,62 @@ def get_stack_frame_variables(function_address: str) -> list[dict]:
 
 
 def rename_stack_frame_variable(function_address: str, old_name: str, new_name: str) -> dict:
+    """Rename stack frame variable with proper main thread execution."""
     try:
-        func = idaapi.get_func(parse_ea(function_address))
-        if not func:
-            return {"ok": False, "error": f"No function found at address {function_address}"}
+        ea = parse_ea(function_address)
+        touch_last_ea(ea)
+        func = validate_function_ea(ea)
         
         out = {"ok": False}
 
         def _do():
             try:
+                # Try Hex-Rays approach first if available
+                if hexrays_available():
+                    try:
+                        cfunc = decompile_func(ea)
+                        
+                        # Find variable in lvars (local variables including stack vars)
+                        target_lvar = None
+                        for lvar in cfunc.lvars:
+                            if lvar.name == old_name or lvar.cname == old_name:
+                                target_lvar = lvar
+                                break
+                        
+                        if target_lvar:
+                            # Use Hex-Rays API for renaming
+                            if hasattr(cfunc, 'set_user_lvar_name'):
+                                if cfunc.set_user_lvar_name(target_lvar, new_name):
+                                    if hasattr(cfunc, 'save_user_lvars'):
+                                        cfunc.save_user_lvars()
+                                    if hasattr(cfunc, 'refresh_view'):
+                                        cfunc.refresh_view(True)
+                                    out.update(ok=True, function_address=function_address, old_name=old_name, new_name=new_name)
+                                    return 1
+                        # If not found in lvars, fall through to frame-based approach
+                    except Exception:
+                        # Fall through to frame-based approach
+                        pass
+                
+                # Frame-based approach using ida_frame APIs
                 frame_tif = _frame_tinfo(func)
                 idx, udm = frame_tif.get_udm(old_name)
                 if not udm:
-                    out.update(error=f"{old_name} not found.")
+                    out.update(error=f"Stack frame variable '{old_name}' not found.")
                     return 0
                 tid = frame_tif.get_udm_tid(idx)
                 if ida_frame.is_special_frame_member(tid):
-                    out.update(error=f"{old_name} is a special frame member.")
+                    out.update(error=f"'{old_name}' is a special frame member and cannot be renamed.")
                     return 0
                 udm2 = ida_typeinf.udm_t()
                 frame_tif.get_udm_by_tid(udm2, tid)
                 offset = udm2.offset // 8
                 if ida_frame.is_funcarg_off(func, offset):
-                    out.update(error=f"{old_name} is an argument member.")
+                    out.update(error=f"'{old_name}' is an argument member and cannot be renamed.")
                     return 0
                 sval = ida_frame.soff_to_fpoff(func, offset)
                 if not ida_frame.define_stkvar(func, new_name, sval, udm2.type):
-                    out.update(error="failed to rename stack frame variable")
+                    out.update(error="Failed to rename stack frame variable (name may be invalid or already exist)")
                     return 0
                 out.update(ok=True, function_address=function_address, old_name=old_name, new_name=new_name)
                 return 1
@@ -186,8 +220,8 @@ def rename_stack_frame_variable(function_address: str, old_name: str, new_name: 
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread with write access for DB modifications
+        if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 
@@ -197,28 +231,36 @@ def rename_stack_frame_variable(function_address: str, old_name: str, new_name: 
 
 
 def create_stack_frame_variable(function_address: str, offset: str, variable_name: str, type_name: str) -> dict:
+    """Create stack frame variable with proper main thread execution."""
     try:
-        func = idaapi.get_func(parse_ea(function_address))
-        if not func:
-            return {"ok": False, "error": f"No function found at address {function_address}"}
+        ea = parse_ea(function_address)
+        touch_last_ea(ea)
+        func = validate_function_ea(ea)
         
         off = parse_ea(offset)
         out = {"ok": False}
 
         def _do():
             try:
-                tif = ida_typeinf.tinfo_t(type_name)
-                if not ida_frame.define_stkvar(func, variable_name, off, tif):
-                    out.update(error="failed to define stack frame variable")
+                # Parse type declaration
+                try:
+                    tif = parse_type_declaration(type_name)
+                except ValueError as e:
+                    out.update(error=str(e))
                     return 0
-                out.update(ok=True, function_address=function_address, offset=hex(off), variable_name=variable_name, type_name=type_name)
+                
+                if not ida_frame.define_stkvar(func, variable_name, off, tif):
+                    out.update(error="Failed to define stack frame variable (offset may be invalid or name already exists)")
+                    return 0
+                    
+                out.update(ok=True, function_address=function_address, offset=ea_to_hex(off), variable_name=variable_name, type_name=type_name)
                 return 1
             except Exception as e:
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread with write access for DB modifications
+        if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 
@@ -228,36 +270,80 @@ def create_stack_frame_variable(function_address: str, offset: str, variable_nam
 
 
 def set_stack_frame_variable_type(function_address: str, variable_name: str, type_name: str) -> dict:
+    """Set stack frame variable type with proper main thread execution."""
     try:
-        func = idaapi.get_func(parse_ea(function_address))
-        if not func:
-            return {"ok": False, "error": f"No function found at address {function_address}"}
+        ea = parse_ea(function_address)
+        touch_last_ea(ea)
+        func = validate_function_ea(ea)
         
         out = {"ok": False}
 
         def _do():
             try:
+                # Try Hex-Rays approach first if available
+                if hexrays_available():
+                    try:
+                        cfunc = decompile_func(ea)
+                        
+                        # Parse type declaration
+                        try:
+                            new_tif = parse_type_declaration(type_name)
+                        except ValueError as e:
+                            out.update(error=str(e))
+                            return 0
+                        
+                        # Find variable in lvars
+                        target_lvar = None
+                        for lvar in cfunc.lvars:
+                            if lvar.name == variable_name or lvar.cname == variable_name:
+                                target_lvar = lvar
+                                break
+                        
+                        if target_lvar:
+                            # Use Hex-Rays API for setting type
+                            if hasattr(cfunc, 'set_user_lvar_type'):
+                                if cfunc.set_user_lvar_type(target_lvar, new_tif):
+                                    if hasattr(cfunc, 'save_user_lvars'):
+                                        cfunc.save_user_lvars()
+                                    if hasattr(cfunc, 'refresh_view'):
+                                        cfunc.refresh_view(True)
+                                    out.update(ok=True, function_address=function_address, variable_name=variable_name, type_name=str(new_tif))
+                                    return 1
+                        # If not found in lvars, fall through to frame-based approach
+                    except Exception:
+                        # Fall through to frame-based approach
+                        pass
+                
+                # Frame-based approach using ida_frame APIs
                 frame_tif = _frame_tinfo(func)
                 idx, udm = frame_tif.get_udm(variable_name)
                 if not udm:
-                    out.update(error=f"{variable_name} not found.")
+                    out.update(error=f"Stack frame variable '{variable_name}' not found.")
                     return 0
                 tid = frame_tif.get_udm_tid(idx)
                 udm2 = ida_typeinf.udm_t()
                 frame_tif.get_udm_by_tid(udm2, tid)
                 offset = udm2.offset // 8
-                tif = ida_typeinf.tinfo_t(type_name)
-                if not ida_frame.set_frame_member_type(func, offset, tif):
-                    out.update(error="failed to set stack frame variable type")
+                
+                # Parse type declaration
+                try:
+                    tif = parse_type_declaration(type_name)
+                except ValueError as e:
+                    out.update(error=str(e))
                     return 0
-                out.update(ok=True, function_address=function_address, variable_name=variable_name, type_name=type_name)
+                
+                if not ida_frame.set_frame_member_type(func, offset, tif):
+                    out.update(error="Failed to set stack frame variable type (type may be invalid)")
+                    return 0
+                    
+                out.update(ok=True, function_address=function_address, variable_name=variable_name, type_name=str(tif))
                 return 1
             except Exception as e:
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread with write access for DB modifications
+        if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 
@@ -267,19 +353,26 @@ def set_stack_frame_variable_type(function_address: str, variable_name: str, typ
 
 
 def delete_stack_frame_variable(function_address: str, variable_name: str) -> dict:
+    """Delete stack frame variable with proper main thread execution."""
     try:
-        func = idaapi.get_func(parse_ea(function_address))
-        if not func:
-            return {"ok": False, "error": f"No function found at address {function_address}"}
+        ea = parse_ea(function_address)
+        touch_last_ea(ea)
+        func = validate_function_ea(ea)
         
         out = {"ok": False}
 
         def _do():
             try:
+                # Prefer explicit message if user expects Hex-Rays behavior
+                if hexrays_available():
+                    # We do not delete lvars via Hex-Rays; provide clear guidance
+                    out.update(error="Operation not supported without direct frame edits; use frame-based tools or install Hex-Rays to rename/type only.")
+                    return 0
+                # Frame-based approach using ida_frame APIs
                 frame_tif = _frame_tinfo(func)
                 idx, udm = frame_tif.get_udm(variable_name)
                 if not udm:
-                    out.update(error=f"{variable_name} not found.")
+                    out.update(error=f"Stack frame variable '{variable_name}' not found.")
                     return 0
                 tid = frame_tif.get_udm_tid(idx)
                 udm2 = ida_typeinf.udm_t()
@@ -287,10 +380,10 @@ def delete_stack_frame_variable(function_address: str, variable_name: str) -> di
                 offset = udm2.offset // 8
                 size = udm2.size // 8
                 if ida_frame.is_funcarg_off(func, offset):
-                    out.update(error=f"{variable_name} is an argument member.")
+                    out.update(error=f"'{variable_name}' is an argument member and cannot be deleted.")
                     return 0
                 if not ida_frame.delete_frame_members(func, offset, offset + size):
-                    out.update(error="failed to delete stack frame variable")
+                    out.update(error="Failed to delete stack frame variable (variable may be protected or in use)")
                     return 0
                 out.update(ok=True, function_address=function_address, variable_name=variable_name)
                 return 1
@@ -298,8 +391,8 @@ def delete_stack_frame_variable(function_address: str, variable_name: str) -> di
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread with write access for DB modifications
+        if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 

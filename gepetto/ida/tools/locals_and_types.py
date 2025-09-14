@@ -1,11 +1,15 @@
 import json
 
 import ida_hexrays
+import ida_funcs
 import ida_kernwin
 import ida_typeinf
 
-from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import (
+    parse_ea, run_on_main_thread, hexrays_available, decompile_func,
+    parse_type_declaration, validate_function_ea, ea_to_hex, touch_last_ea
+)
 
 
 def handle_rename_local_variable_tc(tc, messages):
@@ -38,47 +42,70 @@ def rename_local_variable(function_address: str, old_name: str, new_name: str) -
     
     try:
         ea = parse_ea(function_address)
+        touch_last_ea(ea)
         out = {"ok": False}
 
         def _do():
             try:
-                # Check if function exists and can be decompiled
-                func = ida_hexrays.get_func_by_ea(ea)
-                if not func:
-                    out.update(error=f"Function not found or cannot be decompiled at {function_address}")
+                # Validate function exists
+                validate_function_ea(ea)
+                
+                # Check Hex-Rays availability
+                if not hexrays_available():
+                    out.update(error="Hex-Rays not available: install/enable the Hex-Rays Decompiler.")
                     return 0
                 
-                # Try to get cfunc to verify variable exists
+                # Get decompiled function
                 try:
-                    cfunc = ida_hexrays.decompile(ea)
-                    if cfunc:
-                        # Check if variable exists in local variables
-                        var_found = False
-                        for lvar in cfunc.lvars:
-                            if lvar.name == old_name:
-                                var_found = True
-                                break
-                        
-                        if not var_found:
-                            out.update(error=f"Local variable '{old_name}' not found in function")
+                    cfunc = decompile_func(ea)
+                    
+                    # Check if variable exists in local variables
+                    var_found = False
+                    target_lvar = None
+                    for lvar in cfunc.lvars:
+                        if lvar.name == old_name or lvar.cname == old_name:
+                            var_found = True
+                            target_lvar = lvar
+                            break
+                    
+                    if not var_found:
+                        out.update(error=f"Local variable '{old_name}' not found in function")
+                        return 0
+                    
+                    # Use IDA 9.x API for renaming - prefer set_user_lvar_name if available
+                    if hasattr(cfunc, 'set_user_lvar_name'):
+                        if not cfunc.set_user_lvar_name(target_lvar, new_name):
+                            out.update(error=f"Failed to rename local variable '{old_name}' to '{new_name}'")
                             return 0
-                except Exception:
-                    # If decompilation fails, still try to rename but expect it might fail
-                    pass
-                
-                # Attempt the rename
-                if not ida_hexrays.rename_lvar(ea, old_name, new_name):
-                    out.update(error=f"Failed to rename local variable '{old_name}' (variable may not exist or rename not permitted)")
+                    elif hasattr(target_lvar, 'set_user_name'):
+                        if not target_lvar.set_user_name(new_name):
+                            out.update(error=f"Failed to rename local variable '{old_name}' to '{new_name}'")
+                            return 0
+                    else:
+                        # Fallback to legacy API
+                        if not ida_hexrays.rename_lvar(ea, old_name, new_name):
+                            out.update(error=f"Failed to rename local variable '{old_name}' to '{new_name}'")
+                            return 0
+                    
+                    # Save changes and refresh view
+                    if hasattr(cfunc, 'save_user_lvars'):
+                        cfunc.save_user_lvars()
+                    if hasattr(cfunc, 'refresh_view'):
+                        cfunc.refresh_view(True)
+                        
+                    out.update(ok=True, function_address=function_address, old_name=old_name, new_name=new_name)
+                    return 1
+                    
+                except Exception as e:
+                    out.update(error=str(e))
                     return 0
                     
-                out.update(ok=True, function_address=function_address, old_name=old_name, new_name=new_name)
-                return 1
             except Exception as e:
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread with write access for DB modifications
+        if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 
@@ -107,63 +134,73 @@ def set_local_variable_type(function_address: str, variable_name: str, new_type:
     
     try:
         ea = parse_ea(function_address)
+        touch_last_ea(ea)
         out = {"ok": False}
 
         def _do():
             try:
-                # Parse the new type first
-                new_tif = ida_typeinf.tinfo_t()
+                # Validate function exists
+                validate_function_ea(ea)
+                
+                # Check Hex-Rays availability
+                if not hexrays_available():
+                    out.update(error="Hex-Rays not available: install/enable the Hex-Rays Decompiler.")
+                    return 0
+                
+                # Parse the new type
                 try:
-                    new_tif = ida_typeinf.tinfo_t(new_type, None, ida_typeinf.PT_SIL)
-                    if not new_tif.is_correct():
-                        raise Exception("Invalid type")
-                except Exception:
-                    # Fallback to parse_decl
-                    if not ida_typeinf.parse_decl(new_tif, None, new_type + ";", ida_typeinf.PT_SIL):
-                        out.update(error=f"Failed to parse type: {new_type}")
+                    new_tif = parse_type_declaration(new_type)
+                except ValueError as e:
+                    out.update(error=str(e))
+                    return 0
+                
+                # Get decompiled function and verify variable exists
+                try:
+                    cfunc = decompile_func(ea)
+                    
+                    var_found = False
+                    target_lvar = None
+                    for lvar in cfunc.lvars:
+                        if lvar.name == variable_name or lvar.cname == variable_name:
+                            var_found = True
+                            target_lvar = lvar
+                            break
+                    
+                    if not var_found:
+                        out.update(error=f"Local variable '{variable_name}' not found in function")
                         return 0
-                
-                # Check if function exists and can be decompiled
-                func = ida_hexrays.get_func_by_ea(ea)
-                if not func:
-                    out.update(error=f"Function not found or cannot be decompiled at {function_address}")
-                    return 0
-                
-                # Verify variable exists
-                try:
-                    cfunc = ida_hexrays.decompile(ea)
-                    if cfunc:
-                        var_found = False
-                        for lvar in cfunc.lvars:
-                            if lvar.name == variable_name:
-                                var_found = True
-                                break
-                        
-                        if not var_found:
-                            out.update(error=f"Local variable '{variable_name}' not found in function")
+                    
+                    # Use IDA 9.x API for setting type - prefer set_user_lvar_type if available
+                    if hasattr(cfunc, 'set_user_lvar_type'):
+                        if not cfunc.set_user_lvar_type(target_lvar, new_tif):
+                            out.update(error=f"Failed to set type for local variable '{variable_name}'")
                             return 0
-                except Exception:
-                    # If decompilation fails, still try to proceed but expect it might fail
-                    pass
-                
-                # Test if variable exists by trying to rename it to itself
-                if not ida_hexrays.rename_lvar(ea, variable_name, variable_name):
-                    out.update(error=f"Local variable not found: {variable_name}")
+                    else:
+                        # Fallback to modifier approach
+                        modifier = _LvarTypeModifier(variable_name, new_tif)
+                        if not ida_hexrays.modify_user_lvars(ea, modifier):
+                            out.update(error=f"Failed to modify local variable type: {variable_name}")
+                            return 0
+                    
+                    # Save changes and refresh view
+                    if hasattr(cfunc, 'save_user_lvars'):
+                        cfunc.save_user_lvars()
+                    if hasattr(cfunc, 'refresh_view'):
+                        cfunc.refresh_view(True)
+                        
+                    out.update(ok=True, function_address=function_address, variable_name=variable_name, new_type=str(new_tif))
+                    return 1
+                    
+                except Exception as e:
+                    out.update(error=str(e))
                     return 0
                     
-                modifier = _LvarTypeModifier(variable_name, new_tif)
-                if not ida_hexrays.modify_user_lvars(ea, modifier):
-                    out.update(error=f"Failed to modify local variable type: {variable_name}")
-                    return 0
-                    
-                out.update(ok=True, function_address=function_address, variable_name=variable_name, new_type=str(new_tif))
-                return 1
             except Exception as e:
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread with write access for DB modifications
+        if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 

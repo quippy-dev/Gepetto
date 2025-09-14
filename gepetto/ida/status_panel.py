@@ -577,8 +577,7 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
 class _StatusPanelManager:
     def __init__(self):
         self._form: Optional[GepettoStatusForm] = None
-        # Fallback for environments that only stub MFF_WRITE
-        self._MFF_FAST = getattr(ida_kernwin, "MFF_FAST", getattr(ida_kernwin, "MFF_WRITE", 0))
+        # IDA 9.x-only: use MFF_READ for UI operations
         # Pending state until UI is ready
         self._pending_model: Optional[str] = None
         self._pending_status: Optional[tuple[str, Optional[bool]]] = None
@@ -648,7 +647,7 @@ class _StatusPanelManager:
 
     def _flush_via_exec(self):
         try:
-            ida_kernwin.execute_sync(lambda: (self._flush_pending_ui() or 1), self._MFF_FAST)
+            ida_kernwin.execute_sync(lambda: (self._flush_pending_ui() or 1), ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -692,7 +691,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             # Last-resort fallback to simple print
             try:
@@ -730,7 +729,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -750,7 +749,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -793,7 +792,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -810,7 +809,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -827,7 +826,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -841,7 +840,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -859,7 +858,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -875,7 +874,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -900,7 +899,7 @@ class _StatusPanelManager:
                     return 0
                 return 1
             try:
-                ida_kernwin.execute_sync(_do, self._MFF_FAST)
+                ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
             except Exception:
                 pass
 
@@ -915,7 +914,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -946,7 +945,7 @@ class _StatusPanelManager:
                 return 0
             return 1
         try:
-            ida_kernwin.execute_sync(_do, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
 
@@ -971,7 +970,7 @@ class _StatusPanelManager:
                     except Exception:
                         return 0
                     return 1
-                ida_kernwin.execute_sync(_do, self._MFF_FAST)
+                ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
         except Exception:
             pass
         # Update status/log
@@ -1001,7 +1000,7 @@ class _StatusPanelManager:
                 except Exception:
                     return 0
                 return 1
-            ida_kernwin.execute_sync(_do_log, self._MFF_FAST)
+            ida_kernwin.execute_sync(_do_log, ida_kernwin.MFF_READ)
         except Exception:
             pass
         # Invoke backend cancellation, if registered

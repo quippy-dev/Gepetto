@@ -187,12 +187,8 @@ def rename_callback(address, view, response):
             if idc.set_name(function_addr, new, idaapi.SN_FORCE):
                 replaced.append(old)
         else:
-            if idaapi.IDA_SDK_VERSION < 760:
-                lvars = {lvar.name: lvar for lvar in view.cfunc.lvars}
-                if old in lvars and view.rename_lvar(lvars[old], new, True):
-                    replaced.append(old)
-            else:
-                if ida_hexrays.rename_lvar(function_addr, old, new):
+            # IDA 9.x-only: use modern lvar access
+            if ida_hexrays.rename_lvar(function_addr, old, new):
                     replaced.append(old)
 
     comment = idc.get_func_cmt(address, 0)

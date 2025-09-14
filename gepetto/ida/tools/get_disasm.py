@@ -6,6 +6,7 @@ import ida_kernwin
 
 from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import touch_last_ea
 
 
 def handle_get_disasm_tc(tc, messages):
@@ -18,6 +19,7 @@ def handle_get_disasm_tc(tc, messages):
     ea = args.get("ea")
     try:
         ea = parse_ea(ea)
+        touch_last_ea(ea)
         result = get_disasm(ea)
     except Exception as ex:
         result = {

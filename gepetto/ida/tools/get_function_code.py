@@ -9,6 +9,7 @@ import ida_name
 
 from gepetto.ida.tools.function_utils import parse_ea, resolve_ea, resolve_func, get_func_name
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import touch_last_ea
 
 
 def handle_get_function_code_tc(tc, messages):
@@ -101,6 +102,7 @@ def get_function_code(ea: Optional[int] = None,
         func_name = name or get_func_name(f)
         if not ea:
             ea = resolve_ea(func_name)
+        touch_last_ea(ea)
         pseudocode = _decompile_func(ea)
 
         result.update(

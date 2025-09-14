@@ -7,8 +7,11 @@ import idaapi
 import idautils
 import ida_typeinf
 
-from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import (
+    parse_ea, run_on_main_thread, parse_type_declaration, get_candidates_for_name,
+    ea_to_hex, touch_last_ea
+)
 
 
 def handle_list_globals_tc(tc, messages):
@@ -123,7 +126,7 @@ def list_globals(offset: int, count: int) -> dict:
             out.update({"error": str(e)})
             return 0
     
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
@@ -171,7 +174,7 @@ def list_imports(offset: int, count: int) -> dict:
             out.update({"error": str(e)})
             return 0
     
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
@@ -186,21 +189,43 @@ def rename_global_variable(old_name: str, new_name: str) -> dict:
 
         def _do():
             try:
-                ea = ida_name.get_name_ea(idaapi.BADADDR, old_name)
+                # Try to resolve the name - use get_name_ea_simple for better compatibility
+                ea = idaapi.get_name_ea_simple(old_name)
                 if ea == idaapi.BADADDR:
-                    out.update(error=f"Global '{old_name}' not found")
+                    # Try fallback method
+                    ea = ida_name.get_name_ea(idaapi.BADADDR, old_name)
+                    
+                if ea == idaapi.BADADDR:
+                    # Name not found, provide candidates
+                    candidates = get_candidates_for_name(old_name, max_candidates=5)
+                    if candidates:
+                        out.update(
+                            error=f"Global '{old_name}' not found",
+                            candidates=candidates
+                        )
+                    else:
+                        out.update(error=f"Global '{old_name}' not found")
                     return 0
-                if not idaapi.set_name(ea, new_name, idaapi.SN_CHECK):
-                    out.update(error=f"Failed to rename '{old_name}' -> '{new_name}' (name may be invalid or already exist)")
-                    return 0
-                out.update(ok=True, address=hex(ea), old_name=old_name, new_name=new_name)
+                
+                touch_last_ea(ea)
+                
+                # Use appropriate flags for renaming - SN_CHECK for validation, SN_FORCE if needed
+                flags = idaapi.SN_CHECK
+                if not idaapi.set_name(ea, new_name, flags):
+                    # Try with force flag if initial attempt fails
+                    flags = idaapi.SN_CHECK | idaapi.SN_FORCE
+                    if not idaapi.set_name(ea, new_name, flags):
+                        out.update(error=f"Failed to rename '{old_name}' to '{new_name}' (name may be invalid or protected)")
+                        return 0
+                        
+                out.update(ok=True, address=ea_to_hex(ea), old_name=old_name, new_name=new_name)
                 return 1
             except Exception as e:
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread with write access for name changes
+        if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 
@@ -218,35 +243,46 @@ def set_global_variable_type(variable_name: str, new_type: str) -> dict:
 
         def _do():
             try:
-                ea = ida_name.get_name_ea(idaapi.BADADDR, variable_name)
+                # Try to resolve the name - use get_name_ea_simple for better compatibility
+                ea = idaapi.get_name_ea_simple(variable_name)
                 if ea == idaapi.BADADDR:
-                    out.update(error=f"Global '{variable_name}' not found")
+                    # Try fallback method
+                    ea = ida_name.get_name_ea(idaapi.BADADDR, variable_name)
+                    
+                if ea == idaapi.BADADDR:
+                    # Name not found, provide candidates
+                    candidates = get_candidates_for_name(variable_name, max_candidates=5)
+                    if candidates:
+                        out.update(
+                            error=f"Global '{variable_name}' not found",
+                            candidates=candidates
+                        )
+                    else:
+                        out.update(error=f"Global '{variable_name}' not found")
                     return 0
                 
-                # Parse the type with better error handling
-                tif = ida_typeinf.tinfo_t()
-                try:
-                    tif = ida_typeinf.tinfo_t(new_type)
-                    if not tif.is_correct():
-                        raise Exception("Invalid type")
-                except Exception:
-                    # Fallback to parse_decl
-                    if not ida_typeinf.parse_decl(tif, None, new_type + ";", ida_typeinf.PT_SIL):
-                        out.update(error=f"Failed to parse type: {new_type}")
-                        return 0
+                touch_last_ea(ea)
                 
-                if not ida_typeinf.apply_tinfo(ea, tif, ida_typeinf.PT_SIL):
-                    out.update(error=f"Failed to apply type '{new_type}' to '{variable_name}'")
+                # Parse the type declaration using our utility
+                try:
+                    tif = parse_type_declaration(new_type)
+                except ValueError as e:
+                    out.update(error=str(e))
+                    return 0
+                
+                # Apply type using IDA 9.x API
+                if not ida_typeinf.apply_tinfo(ea, tif, ida_typeinf.TINFO_DEFINITE):
+                    out.update(error=f"Failed to apply type '{new_type}' to '{variable_name}' (type may be incompatible with location)")
                     return 0
                     
-                out.update(ok=True, address=hex(ea), variable_name=variable_name, new_type=str(tif))
+                out.update(ok=True, address=ea_to_hex(ea), variable_name=variable_name, new_type=str(tif))
                 return 1
             except Exception as e:
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        # Execute on main thread with write access for type modifications
+        if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 
@@ -272,7 +308,7 @@ def get_global_variable_value_by_name(variable_name: str) -> str:
                 result["error"] = str(e)
                 return 0
         
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        if not run_on_main_thread(_do, write=False):
             if result["error"]:
                 raise ValueError(result["error"])
             raise ValueError("Failed to execute on main thread")
@@ -358,7 +394,7 @@ def get_global_variable_value_internal(ea: int) -> str:
             return 0
     
     # Use MFF_FAST for better compatibility
-    if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+    if not run_on_main_thread(_do, write=False):
         if result["error"]:
             raise ValueError(result["error"])
         raise ValueError("Failed to execute on main thread")

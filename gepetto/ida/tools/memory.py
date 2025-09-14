@@ -6,6 +6,7 @@ import idaapi
 
 from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import touch_last_ea
 
 
 def handle_read_memory_bytes_tc(tc, messages):
@@ -15,6 +16,7 @@ def handle_read_memory_bytes_tc(tc, messages):
         args = {}
     try:
         addr = parse_ea(args.get("memory_address"))
+        touch_last_ea(addr)
         size = int(args.get("size", 0) or 0)
         if size <= 0:
             raise ValueError("size must be > 0")
@@ -40,6 +42,7 @@ def _simple_read(tc, messages, reader_name: str):
         args = {}
     try:
         ea = parse_ea(args.get("address"))
+        touch_last_ea(ea)
         
         # Run on UI thread (IDA 9.x): many IDA APIs are main-thread-only
         out = {"value": None}
@@ -74,6 +77,8 @@ def handle_data_read_qword_tc(tc, messages):
         args = {}
     try:
         ea = parse_ea(args.get("address"))
+        touch_last_ea(ea)
+        touch_last_ea(ea)
         
         # Run on UI thread (IDA 9.x): many IDA APIs are main-thread-only
         out = {"value": None}

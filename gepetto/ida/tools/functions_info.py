@@ -9,6 +9,9 @@ import idautils
 
 from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import (
+    safe_get_current_address, ea_to_hex, touch_last_ea, run_on_main_thread
+)
 
 
 def handle_get_function_by_name_tc(tc, messages):
@@ -110,7 +113,7 @@ def get_function_by_name(name: str) -> dict:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
@@ -130,14 +133,16 @@ def get_function_by_address(address: str) -> dict:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
 def get_current_address() -> str:
-    # Run on UI thread (IDA 9.x): get_screen_ea is main-thread-only
-    ea = ida_kernwin.execute_sync(ida_kernwin.get_screen_ea, ida_kernwin.MFF_FAST)
-    return hex(ea)
+    """Return current address as hex string, with proper BADADDR handling."""
+    ea = safe_get_current_address()
+    if ea != idaapi.BADADDR:
+        touch_last_ea(ea)
+    return ea_to_hex(ea)
 
 
 def get_current_function() -> dict:
@@ -145,10 +150,15 @@ def get_current_function() -> dict:
 
     def _do():
         try:
-            ea = idaapi.get_screen_ea()
+            ea = safe_get_current_address()
+            if ea == idaapi.BADADDR:
+                out.update(error="No focused view: returning BADADDR. Provide EA explicitly or call an operation that sets last_ea.")
+                return 0
+            
+            touch_last_ea(ea)
             fn = ida_funcs.get_func(ea)
             if not fn:
-                out.update(error="No function at current EA")
+                out.update(error=f"No function at current EA {ea_to_hex(ea)}")
                 return 0
             out.update(ok=True, **_func_info(fn))
             return 1
@@ -156,7 +166,7 @@ def get_current_function() -> dict:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
@@ -184,7 +194,7 @@ def list_functions(offset: int, count: int) -> dict:
             out.update({"error": str(e)})
             return 0
     
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
@@ -207,5 +217,5 @@ def get_entry_points() -> dict:
             out.update({"error": str(e)})
             return 0
     
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
