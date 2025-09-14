@@ -53,7 +53,12 @@ def run_on_main_thread(fn, write=False):
         Result of the function execution (return value of fn), or raises RuntimeError on failure
     """
     if ida_kernwin and idaapi:
-        sync_flag = idaapi.MFF_WRITE if write else idaapi.MFF_READ
+        # Prefer ida_kernwin's flag constants on IDA 9.x
+        try:
+            sync_flag = ida_kernwin.MFF_WRITE if write else ida_kernwin.MFF_READ
+        except Exception:
+            # Fallback to idaapi for older bindings
+            sync_flag = getattr(idaapi, 'MFF_WRITE', 1 if write else 0)
         slot = {}
         def _runner():
             try:

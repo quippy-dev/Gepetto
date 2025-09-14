@@ -7,6 +7,7 @@ import idaapi
 import idautils
 import ida_typeinf
 import ida_bytes
+import idc
 
 from gepetto.ida.tools.tools import add_result_to_messages
 from gepetto.ida.utils.ida9_utils import (
@@ -188,7 +189,7 @@ def rename_global_variable(old_name: str, new_name: str) -> dict:
                 ea = ida_name.get_name_ea(idaapi.BADADDR, old_name)
                 if ea == idaapi.BADADDR:
                     # Fallback method
-                    ea = idaapi.get_name_ea_simple(old_name)
+                    ea = idc.get_name_ea_simple(old_name)
 
                 if ea == idaapi.BADADDR:
                     # Name not found, provide candidates
@@ -242,7 +243,7 @@ def set_global_variable_type(variable_name: str, new_type: str) -> dict:
                 ea = ida_name.get_name_ea(idaapi.BADADDR, variable_name)
                 if ea == idaapi.BADADDR:
                     # Fallback method
-                    ea = idaapi.get_name_ea_simple(variable_name)
+                    ea = idc.get_name_ea_simple(variable_name)
                     
                 if ea == idaapi.BADADDR:
                     # Name not found, provide candidates

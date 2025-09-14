@@ -123,12 +123,11 @@ def set_local_variable_type(function_address: str, variable_name: str, new_type:
                 # Validate and get function
                 func = validate_function_ea(ea)
 
-                # Parse the new type using ida_typeinf.parse_decl
-                tif = ida_typeinf.tinfo_t()
-                decl = new_type.strip()
-                decl = decl if decl.endswith(";") else decl + ";"
-                if not ida_typeinf.parse_decl(tif, None, decl, ida_typeinf.PT_SIL) or not tif.is_correct():
-                    out.update(error=f"Failed to parse type declaration: {new_type}")
+                # Parse new type robustly using ida9_utils helper
+                try:
+                    tif = parse_type_declaration(new_type)
+                except ValueError as e:
+                    out.update(error=str(e))
                     return 0
 
                 # Resolve frame & locate member by name
@@ -146,8 +145,22 @@ def set_local_variable_type(function_address: str, variable_name: str, new_type:
 
                 # Apply the parsed type to the frame member
                 if not ida_frame.set_frame_member_type(func, offset, tif):
-                    out.update(error=f"Failed to set type for local variable '{variable_name}'")
-                    return 0
+                    # Fallback: redefine the stkvar at the same offset
+                    try:
+                        if ida_frame.define_stkvar(func, variable_name, offset, tif):
+                            out.update(ok=True, function_address=function_address, variable_name=variable_name, new_type=str(tif))
+                            return 1
+                        # As a last resort, delete overlapping range for the new size then redefine
+                        new_size = max(1, int(tif.get_size()))
+                        ida_frame.delete_frame_members(func, offset, offset + new_size)
+                        if ida_frame.define_stkvar(func, variable_name, offset, tif):
+                            out.update(ok=True, function_address=function_address, variable_name=variable_name, new_type=str(tif))
+                            return 1
+                        out.update(error=f"Failed to set type for local variable '{variable_name}' (redefine failed)")
+                        return 0
+                    except Exception as _e:
+                        out.update(error=f"Failed to set type for local variable '{variable_name}': {_e}")
+                        return 0
 
                 out.update(ok=True, function_address=function_address, variable_name=variable_name, new_type=str(tif))
                 return 1

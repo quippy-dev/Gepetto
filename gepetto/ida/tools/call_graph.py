@@ -14,28 +14,10 @@ from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_las
 from gepetto.ida.tools.function_utils import resolve_func, get_func_name
 from gepetto.ida.tools.tools import add_result_to_messages
 
-# Compatibility with older IDA versions where is_thunk_func is available
-try:
-    _HAS_IS_THUNK = hasattr(ida_funcs, "is_thunk_func") and callable(ida_funcs.is_thunk_func)
-except Exception:
-    _HAS_IS_THUNK = False
-
-# -----------------------------------------------------------------------------
-
 def _is_thunk_func(fn: ida_funcs.func_t) -> bool:
-    """
-    Version-safe thunk check:
-    - prefer ida_funcs.is_thunk_func if available
-    - else test FUNC_THUNK in fn.flags
-    """
+    """Check thunk status using FUNC_THUNK flag (IDA 9.x)."""
     if not fn:
         return False
-    if _HAS_IS_THUNK:
-        try:
-            return bool(ida_funcs.is_thunk_func(fn))
-        except Exception:
-            pass
-    # Fallback: flags bit test
     return bool(getattr(fn, "flags", 0) & getattr(ida_funcs, "FUNC_THUNK", 0))
 
 # -----------------------------------------------------------------------------

@@ -236,7 +236,12 @@ def search(text: str | None = None, hex: str | None = None, case_sensitive: bool
                     flags=flags,
                     radix=16
                 )
-            ida_kernwin.process_ui_events()
+            # Keep UI responsive when running in interactive mode if available.
+            _p = getattr(ida_kernwin, "process_ui_events", None)
+            try:
+                _p and _p()
+            except Exception:
+                pass
 
     if matches:
         matches = sorted(set(matches))

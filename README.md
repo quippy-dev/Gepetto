@@ -1,12 +1,14 @@
 # Gepetto
 
 Gepetto is a Python plugin which uses various large language models to provide meaning to functions 
-decompiled by IDA Pro (≥ 7.4). It can leverage them to explain what a function does, and to automatically 
+decompiled by IDA Pro 9.x. It can leverage them to explain what a function does, and to automatically 
 rename its variables. Here is a simple example of what results it can provide in mere seconds:
 
 ![](https://github.com/JusticeRage/Gepetto/blob/main/readme/comparison.png?raw=true)
 
 ## Setup
+
+Requirements: IDA Pro 9.x (earlier versions are not supported) and the Hex-Rays Decompiler.
 
 Simply drop this script (`gepetto.py`, as well as the `gepetto/` folder) into your IDA plugins folder (`$IDAUSR/plugins`). 
 By default, on Windows, this should be `%AppData%\Hex-Rays\IDA Pro\plugins` (you may need to create it).

@@ -311,8 +311,25 @@ def set_stack_frame_variable_type(function_address: str, variable_name: str, typ
                     return 0
                 
                 if not ida_frame.set_frame_member_type(func, offset, tif):
-                    out.update(error="Failed to set stack frame variable type (type may be invalid)")
-                    return 0
+                    # Fallback 1: redefine using define_stkvar (supports redefinition).
+                    if ida_frame.define_stkvar(func, variable_name, offset, tif):
+                        out.update(ok=True, function_address=function_address, variable_name=variable_name, type_name=str(tif))
+                        return 1
+                    # Fallback 2: clear the new desired range, then redefine.
+                    try:
+                        new_size = max(1, int(tif.get_size()))
+                    except Exception:
+                        new_size = 1
+                    try:
+                        ida_frame.delete_frame_members(func, offset, offset + new_size)
+                        if ida_frame.define_stkvar(func, variable_name, offset, tif):
+                            out.update(ok=True, function_address=function_address, variable_name=variable_name, type_name=str(tif))
+                            return 1
+                        out.update(error="Failed to set stack frame variable type (redefine failed)")
+                        return 0
+                    except Exception as _e:
+                        out.update(error=f"Failed to set stack frame variable type: {_e}")
+                        return 0
                     
                 out.update(ok=True, function_address=function_address, variable_name=variable_name, type_name=str(tif))
                 return 1
