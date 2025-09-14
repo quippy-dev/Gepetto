@@ -216,7 +216,10 @@ TOOLS = [
         ),
         "parameters": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "prefix": {"type": "string", "description": "Only names starting with this prefix."},
+                "include_globals": {"type": "boolean", "description": "Include non-function symbols (default false)."}
+            },
             "additionalProperties": False,
         },
         "strict": False,
@@ -306,6 +309,34 @@ TOOLS = [
     },
     {
         "type": "function",
+        "name": "find_user_input_sites",
+        "description": (
+            "Find call sites to common user-input APIs (e.g., gets/fgets/scanf, std::getline, ReadFile). "
+            "Useful to locate password-entry points."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "names": {"type": "array", "items": {"type": "string"}, "description": "Optional list of API name substrings to search for."}
+            },
+            "additionalProperties": False,
+        },
+        "strict": False,
+    },
+    {
+        "type": "function",
+        "name": "find_calls_to",
+        "description": "Find call sites to any symbol whose name contains the given substring.",
+        "parameters": {
+            "type": "object",
+            "properties": {"name_filter": {"type": "string", "description": "Substring of callee name (case-insensitive)."}},
+            "required": ["name_filter"],
+            "additionalProperties": False,
+        },
+        "strict": False,
+    },
+    {
+        "type": "function",
         "name": "declare_c_type",
         "description": "Create or update a local type from a C declaration (typedef/struct).",
         "parameters": {
@@ -340,6 +371,20 @@ TOOLS = [
             "required": ["address"],
             "additionalProperties": False,
         },
+        "strict": False,
+    },
+    {
+        "type": "function",
+        "name": "get_function_immediates",
+        "description": "List immediate constants used by instructions in a function.",
+        "parameters": {"type": "object", "properties": {"function_address": {"type": "string"}}, "required": ["function_address"], "additionalProperties": False},
+        "strict": False,
+    },
+    {
+        "type": "function",
+        "name": "get_function_strings",
+        "description": "List strings referenced by a function.",
+        "parameters": {"type": "object", "properties": {"function_address": {"type": "string"}}, "required": ["function_address"], "additionalProperties": False},
         "strict": False,
     },
     {
@@ -769,6 +814,65 @@ TOOLS = [
             "properties": {"address": {"type": "string"}, "assembles": {"type": "string"}},
             "required": ["address", "assembles"],
             "additionalProperties": False,
+        },
+        "strict": False,
+    },
+    {
+        "type": "function",
+        "name": "patch_nop_instructions",
+        "description": (
+            "Replace N instruction(s) starting at address with NOPs of equal total length. "
+            "Writes to the database; do not parallelize."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"address": {"type": "string"}, "count": {"type": "integer", "description": "Number of instructions (default 1)."}},
+            "required": ["address"],
+            "additionalProperties": False,
+        },
+        "strict": False,
+    },
+    {
+        "type": "function",
+        "name": "patch_force_fallthrough",
+        "description": (
+            "Bypass a single conditional by NOPing one instruction at address (force fallthrough). "
+            "Writes to the database; do not parallelize."
+        ),
+        "parameters": {"type": "object", "properties": {"address": {"type": "string"}}, "required": ["address"], "additionalProperties": False},
+        "strict": False,
+    },
+    {
+        "type": "function",
+        "name": "summarize_function",
+        "description": (
+            "Return a compact summary: function info, basic blocks, top callees (with counts), quick metrics, and a preview of strings/immediates. "
+            "Set include_edges=true to also include CFG edges."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "function_address": {"type": "string"},
+                "include_edges": {"type": "boolean", "description": "Include CFG edges (default false)."},
+                "max_preview": {"type": "integer", "description": "Max preview items for strings/immediates (default 10)."},
+                "max_blocks": {"type": "integer", "description": "Cap number of basic blocks processed (default 512)."}
+            },
+            "required": ["function_address"],
+            "additionalProperties": False
+        },
+        "strict": False,
+    },
+    {
+        "type": "function",
+        "name": "summarize_program",
+        "description": "Program-level summary: entry points, categorized imports, and high-fan-in functions.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "top_n": {"type": "integer", "description": "Top N results for high-fan-in (default 10)."},
+                "max_functions": {"type": "integer", "description": "Max functions to scan for fan-in (default 500)."}
+            },
+            "additionalProperties": False
         },
         "strict": False,
     },

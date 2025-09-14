@@ -35,6 +35,10 @@ import gepetto.ida.tools.memory
 import gepetto.ida.tools.patching
 import gepetto.ida.tools.prototypes
 import gepetto.ida.tools.debugger
+import gepetto.ida.tools.heuristics
+import gepetto.ida.tools.function_scan
+import gepetto.ida.tools.function_summary
+import gepetto.ida.tools.program_summary
 
 _ = gepetto.config._
 CLI: ida_kernwin.cli_t = None
@@ -298,6 +302,14 @@ class GepettoCLI(ida_kernwin.cli_t):
                         gepetto.ida.tools.functions_info.handle_get_entry_points_tc(tc, MESSAGES)
                     elif tc.function.name == "set_comment":
                         gepetto.ida.tools.comments.handle_set_comment_tc(tc, MESSAGES)
+                    elif tc.function.name == "find_user_input_sites":
+                        gepetto.ida.tools.heuristics.handle_find_user_input_sites_tc(tc, MESSAGES)
+                    elif tc.function.name == "find_calls_to":
+                        gepetto.ida.tools.heuristics.handle_find_calls_to_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_function_immediates":
+                        gepetto.ida.tools.function_scan.handle_get_function_immediates_tc(tc, MESSAGES)
+                    elif tc.function.name == "get_function_strings":
+                        gepetto.ida.tools.function_scan.handle_get_function_strings_tc(tc, MESSAGES)
                     elif tc.function.name == "rename_lvar":
                         gepetto.ida.tools.rename_lvar.handle_rename_lvar_tc(tc, MESSAGES)
                     elif tc.function.name == "rename_local_variable":
@@ -372,6 +384,14 @@ class GepettoCLI(ida_kernwin.cli_t):
                         gepetto.ida.tools.memory.handle_data_read_string_tc(tc, MESSAGES)
                     elif tc.function.name == "patch_address_assembles":
                         gepetto.ida.tools.patching.handle_patch_address_assembles_tc(tc, MESSAGES)
+                    elif tc.function.name == "patch_nop_instructions":
+                        gepetto.ida.tools.patching.handle_patch_nop_instructions_tc(tc, MESSAGES)
+                    elif tc.function.name == "patch_force_fallthrough":
+                        gepetto.ida.tools.patching.handle_patch_force_fallthrough_tc(tc, MESSAGES)
+                    elif tc.function.name == "summarize_program":
+                        gepetto.ida.tools.program_summary.handle_summarize_program_tc(tc, MESSAGES)
+                    elif tc.function.name == "summarize_function":
+                        gepetto.ida.tools.function_summary.handle_summarize_function_tc(tc, MESSAGES)
                     elif tc.function.name == "dbg_get_registers":
                         gepetto.ida.tools.debugger.handle_dbg_get_registers_tc(tc, MESSAGES)
                     elif tc.function.name == "dbg_get_call_stack":
