@@ -6,6 +6,7 @@ import ida_name
 import idaapi
 import idautils
 import ida_typeinf
+import ida_bytes
 
 from gepetto.ida.tools.tools import add_result_to_messages
 from gepetto.ida.utils.ida9_utils import (
@@ -183,12 +184,12 @@ def rename_global_variable(old_name: str, new_name: str) -> dict:
 
         def _do():
             try:
-                # Try to resolve the name - use get_name_ea_simple for better compatibility
-                ea = idaapi.get_name_ea_simple(old_name)
+                # Resolve the name using ida_name.get_name_ea first
+                ea = ida_name.get_name_ea(idaapi.BADADDR, old_name)
                 if ea == idaapi.BADADDR:
-                    # Try fallback method
-                    ea = ida_name.get_name_ea(idaapi.BADADDR, old_name)
-                    
+                    # Fallback method
+                    ea = idaapi.get_name_ea_simple(old_name)
+
                 if ea == idaapi.BADADDR:
                     # Name not found, provide candidates
                     candidates = get_candidates_for_name(old_name, max_candidates=5)
@@ -237,11 +238,11 @@ def set_global_variable_type(variable_name: str, new_type: str) -> dict:
 
         def _do():
             try:
-                # Try to resolve the name - use get_name_ea_simple for better compatibility
-                ea = idaapi.get_name_ea_simple(variable_name)
+                # Resolve the name using ida_name.get_name_ea first
+                ea = ida_name.get_name_ea(idaapi.BADADDR, variable_name)
                 if ea == idaapi.BADADDR:
-                    # Try fallback method
-                    ea = ida_name.get_name_ea(idaapi.BADADDR, variable_name)
+                    # Fallback method
+                    ea = idaapi.get_name_ea_simple(variable_name)
                     
                 if ea == idaapi.BADADDR:
                     # Name not found, provide candidates
@@ -264,8 +265,8 @@ def set_global_variable_type(variable_name: str, new_type: str) -> dict:
                     out.update(error=str(e))
                     return 0
                 
-                # Apply type using IDA 9.x API
-                if not ida_typeinf.apply_tinfo(ea, tif, ida_typeinf.TINFO_DEFINITE):
+                # Apply type using IDA 9.x API via ida_nalt.set_tinfo
+                if not ida_nalt.set_tinfo(ea, tif):
                     out.update(error=f"Failed to apply type '{new_type}' to '{variable_name}' (type may be incompatible with location)")
                     return 0
                     
@@ -359,18 +360,18 @@ def get_global_variable_value_internal(ea: int) -> str:
                     except Exception:
                         result["value"] = "<string read error>"
                 elif size == 1:
-                    result["value"] = hex(idaapi.get_byte(ea))
+                    result["value"] = hex(ida_bytes.get_byte(ea))
                 elif size == 2:
-                    result["value"] = hex(idaapi.get_word(ea))
+                    result["value"] = hex(ida_bytes.get_word(ea))
                 elif size == 4:
-                    result["value"] = hex(idaapi.get_dword(ea))
+                    result["value"] = hex(ida_bytes.get_dword(ea))
                 elif size == 8:
-                    result["value"] = hex(idaapi.get_qword(ea))
+                    result["value"] = hex(ida_bytes.get_qword(ea))
                 else:
                     # For larger sizes, read bytes safely with size limit
                     max_size = min(size, 64)  # Limit to 64 bytes for safety
                     try:
-                        data = idaapi.get_bytes(ea, max_size)
+                        data = ida_bytes.get_bytes(ea, max_size)
                         if data:
                             result["value"] = " ".join(f"{x:#02x}" for x in data)
                             if size > max_size:

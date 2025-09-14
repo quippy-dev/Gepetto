@@ -1,9 +1,11 @@
 import json
 
 import ida_hexrays
+import ida_frame
 import ida_funcs
 import ida_kernwin
 import ida_typeinf
+import idaapi
 
 from gepetto.ida.tools.tools import add_result_to_messages
 from gepetto.ida.utils.ida9_utils import (
@@ -39,7 +41,6 @@ def handle_set_local_variable_type_tc(tc, messages):
 def rename_local_variable(function_address: str, old_name: str, new_name: str) -> dict:
     if not old_name or new_name is None:
         return {"ok": False, "error": "old_name and new_name are required"}
-    
     try:
         ea = parse_ea(function_address)
         touch_last_ea(ea)
@@ -47,68 +48,49 @@ def rename_local_variable(function_address: str, old_name: str, new_name: str) -
 
         def _do():
             try:
-                # Validate function exists
-                validate_function_ea(ea)
-                
-                # Check Hex-Rays availability
-                if not hexrays_available():
-                    out.update(error="Hex-Rays not available: install/enable the Hex-Rays Decompiler.")
+                # Validate and get function
+                func = validate_function_ea(ea)
+
+                # Resolve frame tinfo and locate member by name
+                frame_tif = ida_typeinf.tinfo_t()
+                if not ida_frame.get_func_frame(frame_tif, func):
+                    out.update(error="Function frame not found.")
                     return 0
-                
-                # Get decompiled function
+                idx, udm = frame_tif.get_udm(old_name)
+                if not udm:
+                    out.update(error=f"Local variable '{old_name}' not found in frame")
+                    return 0
+                tid = frame_tif.get_udm_tid(idx)
+                if ida_frame.is_special_frame_member(tid):
+                    out.update(error=f"'{old_name}' is a special frame member and cannot be renamed.")
+                    return 0
+                udm2 = ida_typeinf.udm_t()
+                frame_tif.get_udm_by_tid(udm2, tid)
+                offset = udm2.offset // 8
+                if ida_frame.is_funcarg_off(func, offset):
+                    out.update(error=f"'{old_name}' is an argument member and cannot be renamed.")
+                    return 0
+
+                # Rename the frame UDM using tinfo_t (IDA 9.x)
                 try:
-                    cfunc = decompile_func(ea)
-                    
-                    # Check if variable exists in local variables
-                    var_found = False
-                    target_lvar = None
-                    for lvar in cfunc.lvars:
-                        if lvar.name == old_name or lvar.cname == old_name:
-                            var_found = True
-                            target_lvar = lvar
-                            break
-                    
-                    if not var_found:
-                        out.update(error=f"Local variable '{old_name}' not found in function")
-                        return 0
-                    
-                    # Use IDA 9.x API for renaming - prefer set_user_lvar_name if available
-                    if hasattr(cfunc, 'set_user_lvar_name'):
-                        if not cfunc.set_user_lvar_name(target_lvar, new_name):
-                            out.update(error=f"Failed to rename local variable '{old_name}' to '{new_name}'")
-                            return 0
-                    elif hasattr(target_lvar, 'set_user_name'):
-                        if not target_lvar.set_user_name(new_name):
-                            out.update(error=f"Failed to rename local variable '{old_name}' to '{new_name}'")
-                            return 0
-                    else:
-                        # Fallback to legacy API
-                        if not ida_hexrays.rename_lvar(ea, old_name, new_name):
-                            out.update(error=f"Failed to rename local variable '{old_name}' to '{new_name}'")
-                            return 0
-                    
-                    # Save changes and refresh view
-                    if hasattr(cfunc, 'save_user_lvars'):
-                        cfunc.save_user_lvars()
-                    if hasattr(cfunc, 'refresh_view'):
-                        cfunc.refresh_view(True)
-                        
-                    out.update(ok=True, function_address=function_address, old_name=old_name, new_name=new_name)
-                    return 1
-                    
-                except Exception as e:
-                    out.update(error=str(e))
+                    rc = frame_tif.rename_udm(idx, new_name)
+                    ok2 = bool(rc) if isinstance(rc, bool) else (rc == 0 if isinstance(rc, int) else bool(rc))
+                except Exception:
+                    ok2 = False
+                if not ok2:
+                    out.update(error=f"Failed to rename local variable '{old_name}' to '{new_name}'")
                     return 0
-                    
+
+                out.update(ok=True, function_address=function_address, old_name=old_name, new_name=new_name)
+                return 1
             except Exception as e:
                 out.update(error=str(e))
                 return 0
 
-        # Execute on main thread with write access for DB modifications
+        # Execute on main thread with write access
         if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
-                
         return out
     except Exception as e:
         return {"ok": False, "error": f"Local variable rename failed: {str(e)}"}
@@ -131,7 +113,6 @@ class _LvarTypeModifier(ida_hexrays.user_lvar_modifier_t):
 def set_local_variable_type(function_address: str, variable_name: str, new_type: str) -> dict:
     if not function_address or not variable_name or not new_type:
         return {"ok": False, "error": "function_address, variable_name, new_type are required"}
-    
     try:
         ea = parse_ea(function_address)
         touch_last_ea(ea)
@@ -139,71 +120,45 @@ def set_local_variable_type(function_address: str, variable_name: str, new_type:
 
         def _do():
             try:
-                # Validate function exists
-                validate_function_ea(ea)
-                
-                # Check Hex-Rays availability
-                if not hexrays_available():
-                    out.update(error="Hex-Rays not available: install/enable the Hex-Rays Decompiler.")
+                # Validate and get function
+                func = validate_function_ea(ea)
+
+                # Parse the new type using ida_typeinf.parse_decl
+                tif = ida_typeinf.tinfo_t()
+                decl = new_type.strip()
+                decl = decl if decl.endswith(";") else decl + ";"
+                if not ida_typeinf.parse_decl(tif, None, decl, ida_typeinf.PT_SIL) or not tif.is_correct():
+                    out.update(error=f"Failed to parse type declaration: {new_type}")
                     return 0
-                
-                # Parse the new type
-                try:
-                    new_tif = parse_type_declaration(new_type)
-                except ValueError as e:
-                    out.update(error=str(e))
+
+                # Resolve frame & locate member by name
+                frame_tif = ida_typeinf.tinfo_t()
+                if not ida_frame.get_func_frame(frame_tif, func):
+                    out.update(error="Function frame not found.")
                     return 0
-                
-                # Get decompiled function and verify variable exists
-                try:
-                    cfunc = decompile_func(ea)
-                    
-                    var_found = False
-                    target_lvar = None
-                    for lvar in cfunc.lvars:
-                        if lvar.name == variable_name or lvar.cname == variable_name:
-                            var_found = True
-                            target_lvar = lvar
-                            break
-                    
-                    if not var_found:
-                        out.update(error=f"Local variable '{variable_name}' not found in function")
-                        return 0
-                    
-                    # Use IDA 9.x API for setting type - prefer set_user_lvar_type if available
-                    if hasattr(cfunc, 'set_user_lvar_type'):
-                        if not cfunc.set_user_lvar_type(target_lvar, new_tif):
-                            out.update(error=f"Failed to set type for local variable '{variable_name}'")
-                            return 0
-                    else:
-                        # Fallback to modifier approach
-                        modifier = _LvarTypeModifier(variable_name, new_tif)
-                        if not ida_hexrays.modify_user_lvars(ea, modifier):
-                            out.update(error=f"Failed to modify local variable type: {variable_name}")
-                            return 0
-                    
-                    # Save changes and refresh view
-                    if hasattr(cfunc, 'save_user_lvars'):
-                        cfunc.save_user_lvars()
-                    if hasattr(cfunc, 'refresh_view'):
-                        cfunc.refresh_view(True)
-                        
-                    out.update(ok=True, function_address=function_address, variable_name=variable_name, new_type=str(new_tif))
-                    return 1
-                    
-                except Exception as e:
-                    out.update(error=str(e))
+                idx, udm = frame_tif.get_udm(variable_name)
+                if not udm:
+                    out.update(error=f"Local variable '{variable_name}' not found in frame")
                     return 0
-                    
+                udm2 = ida_typeinf.udm_t()
+                frame_tif.get_udm_by_tid(udm2, frame_tif.get_udm_tid(idx))
+                offset = udm2.offset // 8
+
+                # Apply the parsed type to the frame member
+                if not ida_frame.set_frame_member_type(func, offset, tif):
+                    out.update(error=f"Failed to set type for local variable '{variable_name}'")
+                    return 0
+
+                out.update(ok=True, function_address=function_address, variable_name=variable_name, new_type=str(tif))
+                return 1
             except Exception as e:
                 out.update(error=str(e))
                 return 0
 
-        # Execute on main thread with write access for DB modifications
+        # Execute on main thread with write access
         if not run_on_main_thread(_do, write=True):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
-                
         return out
     except Exception as e:
         return {"ok": False, "error": f"Local variable type setting failed: {str(e)}"}

@@ -41,17 +41,34 @@ plugin_state = {"last_ea": None}
 def run_on_main_thread(fn, write=False):
     """
     Execute a function on the main thread using appropriate synchronization.
-    
+
+    Always traps exceptions inside the scheduled callable to avoid
+    execute_sync() surfacing a low-level "exception set" error.
+
     Args:
         fn: Function to execute
         write: If True, use MFF_WRITE for database modifications, otherwise MFF_READ
-        
+
     Returns:
-        Result of the function execution
+        Result of the function execution (return value of fn), or raises RuntimeError on failure
     """
     if ida_kernwin and idaapi:
         sync_flag = idaapi.MFF_WRITE if write else idaapi.MFF_READ
-        return ida_kernwin.execute_sync(fn, sync_flag)
+        slot = {}
+        def _runner():
+            try:
+                slot["result"] = fn()
+                slot["ok"] = True
+            except Exception as e:
+                slot["ok"] = False
+                slot["error"] = str(e)
+            return 1
+        ida_kernwin.execute_sync(_runner, sync_flag)
+        if not slot.get("ok", False):
+            # Unify error text for upstream callers
+            err = slot.get("error") or "Failed to execute on main thread"
+            raise RuntimeError(err)
+        return slot.get("result")
     # Outside IDA: best effort fallback to direct call
     return fn()
 

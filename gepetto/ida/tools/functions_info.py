@@ -41,7 +41,14 @@ def handle_get_function_by_address_tc(tc, messages):
 
 def handle_get_current_address_tc(tc, messages):
     try:
-        result = {"ok": True, "address": get_current_address()}
+        addr = get_current_address()
+        if addr == "BADADDR":
+            result = {
+                "ok": False,
+                "error": "No focused view: returning BADADDR. Provide EA explicitly or call an operation that sets last_ea."
+            }
+        else:
+            result = {"ok": True, "address": addr}
     except Exception as ex:
         result = {"ok": False, "error": str(ex)}
     add_result_to_messages(messages, tc, result)
@@ -139,11 +146,18 @@ def get_function_by_address(address: str) -> dict:
 
 
 def get_current_address() -> str:
-    """Return current address as hex string, with proper BADADDR handling."""
+    """Return current address as hex string, using safe_get_current_address() with fallbacks."""
     ea = safe_get_current_address()
-    if ea != idaapi.BADADDR:
-        touch_last_ea(ea)
-    return ea_to_hex(ea)
+    # Determine BADADDR constant robustly
+    try:
+        bad = idaapi.BADADDR
+    except Exception:
+        from gepetto.ida.utils.ida9_utils import BADADDR as _BAD
+        bad = _BAD
+    if ea is None or ea == bad:
+        return "BADADDR"
+    touch_last_ea(int(ea))
+    return ea_to_hex(int(ea))
 
 
 def get_current_function() -> dict:

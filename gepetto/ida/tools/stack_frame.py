@@ -142,11 +142,10 @@ def get_stack_frame_variables(function_address: str) -> list[dict]:
                 result["members"] = []
                 return 0
         
-        # Execute on main thread for read operations
-        if not run_on_main_thread(_do, write=False):
+        # Execute on main thread with write access for stability on IDA 9.x
+        if not run_on_main_thread(_do, write=True):
             if result["error"]:
                 raise ValueError(f"Failed to get stack frame variables: {result['error']}")
-            
         return result["members"]
         
     except Exception as e:
@@ -166,34 +165,9 @@ def rename_stack_frame_variable(function_address: str, old_name: str, new_name: 
 
         def _do():
             try:
-                # Try Hex-Rays approach first if available
-                if hexrays_available():
-                    try:
-                        cfunc = decompile_func(ea)
-                        
-                        # Find variable in lvars (local variables including stack vars)
-                        target_lvar = None
-                        for lvar in cfunc.lvars:
-                            if lvar.name == old_name or lvar.cname == old_name:
-                                target_lvar = lvar
-                                break
-                        
-                        if target_lvar:
-                            # Use Hex-Rays API for renaming
-                            if hasattr(cfunc, 'set_user_lvar_name'):
-                                if cfunc.set_user_lvar_name(target_lvar, new_name):
-                                    if hasattr(cfunc, 'save_user_lvars'):
-                                        cfunc.save_user_lvars()
-                                    if hasattr(cfunc, 'refresh_view'):
-                                        cfunc.refresh_view(True)
-                                    out.update(ok=True, function_address=function_address, old_name=old_name, new_name=new_name)
-                                    return 1
-                        # If not found in lvars, fall through to frame-based approach
-                    except Exception:
-                        # Fall through to frame-based approach
-                        pass
+                # Frame-based approach only: operate on the function frame structure
                 
-                # Frame-based approach using ida_frame APIs
+                # Frame-based approach using ida_typeinf/ida_frame APIs (IDA 9.x)
                 frame_tif = _frame_tinfo(func)
                 idx, udm = frame_tif.get_udm(old_name)
                 if not udm:
@@ -209,8 +183,13 @@ def rename_stack_frame_variable(function_address: str, old_name: str, new_name: 
                 if ida_frame.is_funcarg_off(func, offset):
                     out.update(error=f"'{old_name}' is an argument member and cannot be renamed.")
                     return 0
-                sval = ida_frame.soff_to_fpoff(func, offset)
-                if not ida_frame.define_stkvar(func, new_name, sval, udm2.type):
+                # Rename the frame UDM using tinfo_t (IDA 9.x)
+                try:
+                    rc = frame_tif.rename_udm(idx, new_name)
+                    ok = bool(rc) if isinstance(rc, bool) else (rc == 0 if isinstance(rc, int) else bool(rc))
+                except Exception as _e:
+                    ok = False
+                if not ok:
                     out.update(error="Failed to rename stack frame variable (name may be invalid or already exist)")
                     return 0
                 out.update(ok=True, function_address=function_address, old_name=old_name, new_name=new_name)

@@ -3,6 +3,10 @@ from typing import Optional
 
 import ida_hexrays
 import ida_kernwin
+import ida_frame
+import ida_typeinf
+import ida_funcs
+import idaapi
 
 from gepetto.ida.utils.ida9_utils import parse_ea
 from gepetto.ida.tools.function_utils import resolve_ea, resolve_func, get_func_name
@@ -41,7 +45,7 @@ def rename_lvar(
     old_name: Optional[str] = None,
     new_name: Optional[str] = None,
 ) -> dict:
-    """Rename a local variable in a function."""
+    """Rename a local (stack frame) variable by updating the frame member name."""
     if not old_name or not new_name:
         raise ValueError("old_name and new_name are required")
 
@@ -57,32 +61,33 @@ def rename_lvar(
 
     def _do():
         try:
-            if not hexrays_available():
-                out["error"] = "Hex-Rays not available: install/enable the Hex-Rays Decompiler."
+            # Use ida_typeinf/ida_frame in IDA 9.x
+            frame_tif = ida_typeinf.tinfo_t()
+            if not ida_frame.get_func_frame(frame_tif, f):
+                out["error"] = "Function frame not found."
                 return 0
-            cfunc = decompile_func(ea)
-            target_lvar = None
-            for lvar in getattr(cfunc, "lvars", []):
-                if lvar.name == old_name or getattr(lvar, "cname", None) == old_name:
-                    target_lvar = lvar
-                    break
-            if not target_lvar:
-                out["error"] = f"Local variable {old_name!r} not found"
+            idx, udm = frame_tif.get_udm(old_name)
+            if not udm:
+                out["error"] = f"Local variable {old_name!r} not found in frame"
                 return 0
-            renamed = False
-            if hasattr(cfunc, "set_user_lvar_name"):
-                renamed = bool(cfunc.set_user_lvar_name(target_lvar, new_name))
-            elif hasattr(target_lvar, "set_user_name"):
-                renamed = bool(target_lvar.set_user_name(new_name))
-            else:
-                renamed = bool(ida_hexrays.rename_lvar(ea, old_name, new_name))
-            if not renamed:
+            tid = frame_tif.get_udm_tid(idx)
+            if ida_frame.is_special_frame_member(tid):
+                out["error"] = f"'{old_name}' is a special frame member and cannot be renamed."
+                return 0
+            udm2 = ida_typeinf.udm_t()
+            frame_tif.get_udm_by_tid(udm2, tid)
+            offset = udm2.offset // 8
+            if ida_frame.is_funcarg_off(f, offset):
+                out["error"] = f"'{old_name}' is an argument member and cannot be renamed."
+                return 0
+            try:
+                rc = frame_tif.rename_udm(idx, new_name)
+                ok = bool(rc) if isinstance(rc, bool) else (rc == 0 if isinstance(rc, int) else bool(rc))
+            except Exception:
+                ok = False
+            if not ok:
                 out["error"] = f"Failed to rename lvar {old_name!r}"
                 return 0
-            if hasattr(cfunc, "save_user_lvars"):
-                cfunc.save_user_lvars()
-            if hasattr(cfunc, "refresh_view"):
-                cfunc.refresh_view(True)
             out["ok"] = True
             return 1
         except Exception as e:
