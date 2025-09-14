@@ -95,13 +95,17 @@ TOOLS = [
     {
         "type": "function",
         "name": "get_bytes",
-        "description": "Return raw bytes for an effective address.",
+        "description": "Return raw bytes for an effective address (default size = 0x20).",
         "parameters": {
             "type": "object",
             "properties": {
                 "ea": {
                     "type": "integer",
                     "description": "Effective address to read from.",
+                },
+                "size": {
+                    "type": "integer",
+                    "description": "Number of bytes to read (optional)."
                 }
             },
             "required": ["ea"],
@@ -112,13 +116,13 @@ TOOLS = [
     {
         "type": "function",
         "name": "get_function_code",
-        "description": "Return Hex-Rays pseudocode for a function.",
+        "description": "Return Hex-Rays pseudocode for the function that contains the given EA.",
         "parameters": {
             "type": "object",
             "properties": {
                 "ea": {
                     "type": "integer",
-                    "description": "Effective address (EA) inside the target function, in either decimal or hex."
+                    "description": "EA inside the target function (decimal or hex)."
                 },
             },
             "required": ["ea"],
@@ -154,7 +158,7 @@ TOOLS = [
     {
         "type": "function",
         "name": "rename_function",
-        "description": "Rename a function.",
+        "description": "Rename a function. Use a unique, valid identifier; IDA may adjust invalid names.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -220,16 +224,14 @@ TOOLS = [
     {
         "type": "function",
         "name": "search",
-        "description": "Search the binary for specific text strings or hex byte patterns. Returns the addresses (EAs) where matches were found. For enumerating all strings, use the `list_strings` function instead.",
+        "description": "Search for text or hex byte patterns. Provide exactly one of 'text' or 'hex'.",
         "parameters": {
             "type": "object",
             "properties": {
-                "text": {
-                    "type": "string",
-                    "description": "Text to search for (ASCII/Unicode, case-insensitive by default)."
-                }
+                "text": {"type": "string", "description": "Text to search (ASCII/Unicode)."},
+                "hex": {"type": "string", "description": "Hex pattern (e.g., '90 90 ?? 55')."},
+                "case_sensitive": {"type": "boolean", "description": "Case-sensitive text search (default false)."}
             },
-            "required": ["text"],
             "additionalProperties": False,
         },
         "strict": False,
@@ -240,7 +242,18 @@ TOOLS = [
         "description": "Enumerate discovered strings with pagination and filters.",
         "parameters": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "limit": {"type": "integer", "description": "Max items to return (default 200)."},
+                "offset": {"type": "integer", "description": "Start index (default 0)."},
+                "min_len": {"type": "integer", "description": "Minimum string length (default 4)."},
+                "encodings": {"type": "array", "items": {"type": "string"}, "description": "Subset, e.g., ['ascii','utf16']."},
+                "segments": {"type": "array", "items": {"type": "string"}, "description": "Segment names to include."},
+                "include_xrefs": {"type": "boolean", "description": "Also return xrefs to each string."},
+                "include_text": {"type": "boolean", "description": "Include (clipped) string text."},
+                "max_text_bytes": {"type": "integer", "description": "Clip text to at most N bytes (default 256)."},
+                "return_addresses_only": {"type": "boolean", "description": "Return only EAs instead of metadata."},
+                "sort_by": {"type": "string", "enum": ["ea", "len", "segment"], "description": "Sort key (default 'ea')."}
+            },
             "additionalProperties": False,
         },
         "strict": False,
@@ -294,7 +307,7 @@ TOOLS = [
     {
         "type": "function",
         "name": "declare_c_type",
-        "description": "Create or update a local type from a C declaration.",
+        "description": "Create or update a local type from a C declaration (typedef/struct).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -332,7 +345,7 @@ TOOLS = [
     {
         "type": "function",
         "name": "get_current_address",
-        "description": "Return the current EA as a hex string.",
+        "description": "Return the current EA as a hex string. May return 'BADADDR' if no view is focused.",
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
         "strict": False,
     },
@@ -516,7 +529,12 @@ TOOLS = [
     {
         "type": "function",
         "name": "set_local_variable_type",
-        "description": "Set a local variable's type in a function.",
+        "description": (
+            "Set a local (stack frame) variable's type. "
+            "Call get_stack_frame_variables first to discover the exact variable_name. "
+            "Examples: new_type='int', 'char[16]', 'int32_t' (after declare_c_type). "
+            "Writes to the database; do not parallelize."
+        ),
         "parameters": {"type": "object", "properties": {"function_address": {"type": "string"}, "variable_name": {"type": "string"}, "new_type": {"type": "string"}}, "required": ["function_address", "variable_name", "new_type"], "additionalProperties": False},
         "strict": False,
     },
@@ -530,7 +548,10 @@ TOOLS = [
     {
         "type": "function",
         "name": "rename_stack_frame_variable",
-        "description": "Rename a stack variable in a function.",
+        "description": (
+            "Rename a local (stack) variable by its current frame name. "
+            "Arguments in the frame cannot be renamed. Writes to the database; do not parallelize."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -546,7 +567,11 @@ TOOLS = [
     {
         "type": "function",
         "name": "create_stack_frame_variable",
-        "description": "Create a stack variable at offset with given type.",
+        "description": (
+            "Create a stack variable at the given frame offset (locals use negative offsets like -0x8). "
+            "type_name may be any valid C type (e.g., 'int', 'char[32]', or a typedef declared via declare_c_type). "
+            "Writes to the database; do not parallelize."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -563,7 +588,10 @@ TOOLS = [
     {
         "type": "function",
         "name": "set_stack_frame_variable_type",
-        "description": "Set the type for an existing stack variable.",
+        "description": (
+            "Set the type for an existing stack variable. "
+            "Prefer this over set_local_variable_type when working with frame members. Writes to the database; do not parallelize."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -579,7 +607,10 @@ TOOLS = [
     {
         "type": "function",
         "name": "delete_stack_frame_variable",
-        "description": "Delete a named stack variable.",
+        "description": (
+            "Delete a named stack (frame) variable. Arguments and special frame members cannot be deleted. "
+            "Writes to the database; do not parallelize."
+        ),
         "parameters": {
             "type": "object",
             "properties": {

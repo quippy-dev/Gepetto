@@ -384,7 +384,27 @@ class GPT(LanguageModel):
         if isinstance(query, str):
             conversation = [{"role": "user", "content": query}]
         else:
-            conversation = query
+            conversation = list(query)
+
+        # If parallel tool calls are enabled, inject a one-line safety hint for the model.
+        try:
+            # Preference order: explicit option > config default
+            ptc_opt = None
+            if isinstance(additional_model_options, dict):
+                ptc_opt = additional_model_options.get("parallel_tool_calls")
+            if ptc_opt is None:
+                cfg = gepetto.config.get_config("OpenAI", "PARALLEL_TOOL_CALLS", default="false")
+                ptc_enabled = str(cfg).strip().lower() in ("1", "true", "yes", "on")
+            else:
+                ptc_enabled = bool(ptc_opt)
+        except Exception:
+            ptc_enabled = False
+        if ptc_enabled:
+            hint = (
+                "Parallel tool calls are enabled. You may issue multiple read-only tools in parallel (e.g., get_disasm, get_bytes, list_strings, search, list_symbols, get_xrefs/callers/callees, get_metadata). "
+                "Do NOT parallelize any write operations (rename_*, set_*, create_*, delete_*, declare_c_type, set_function_prototype, patch_*, dbg_*); sequence those strictly."
+            )
+            conversation.insert(0, {"role": "system", "content": hint})
 
         # Route by API mode
         if not getattr(self, "use_responses_api", True):
