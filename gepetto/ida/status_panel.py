@@ -35,6 +35,11 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
         # Log area (use QTextEdit to allow simple styling)
         self._log = QtWidgets.QTextEdit()
         self._log.setReadOnly(True)
+        # Disable cursor visibility to prevent user from seeing cursor position
+        try:
+            self._log.setCursorWidth(0)
+        except Exception:
+            pass
         try:
             # QTextEdit doesn't have setMaximumBlockCount; cap document size via block count if available
             self._log.document().setMaximumBlockCount(5000)
@@ -140,10 +145,18 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
         except Exception:
             pass
 
+    # Force cursor to the very end of the document to prevent user interference
+    def _force_cursor_to_end(self):
+        if QtGui is None:
+            return
+        self._log.moveCursor(QtGui.QTextCursor.MoveOperation.End)
+
     # Ensure subsequent insertions use default (non-italic, default color) format
     def _reset_char_format(self):
         if QtGui is None:
             return
+        # Always force cursor to end before setting format
+        self._force_cursor_to_end()
         cursor = self._log.textCursor()
         fmt = QtGui.QTextCharFormat()
         fmt.setFontItalic(False)
@@ -253,8 +266,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
                 return
         # Ensure each log entry starts at the beginning of a line
         self._ensure_line_start()
-        # Use the robust moveCursor + insertPlainText pattern
-        self._log.moveCursor(QtGui.QTextCursor.MoveOperation.End)
+        # Force cursor to end to prevent user interference
+        self._force_cursor_to_end()
         # Force default format (non-italic, default color)
         self._reset_char_format()
         self._log.insertPlainText(entry)
@@ -317,8 +330,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
             if str(prefix).startswith("Reasoning: "):
                 return
 
-        # Move cursor to the very end of the document
-        self._log.moveCursor(QtGui.QTextCursor.MoveOperation.End)
+        # Force cursor to end to prevent user interference
+        self._force_cursor_to_end()
 
         # Initialize the stream line if needed
         if not self._stream_active:
@@ -331,7 +344,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
             self._reset_char_format()
             self._log.insertPlainText(header)
 
-        # Now, insert the new text at the cursor's current position
+        # Force cursor to end again before inserting new text
+        self._force_cursor_to_end()
         self._log.insertPlainText(text)
         # Always autoscroll
         self._log.verticalScrollBar().setValue(self._log.verticalScrollBar().maximum())
@@ -359,7 +373,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
             except Exception:
                 pass
             return
-        self._log.moveCursor(QtGui.QTextCursor.MoveOperation.End)
+        # Force cursor to end to prevent user interference
+        self._force_cursor_to_end()
         try:
             self._log.insertHtml(html)
         except Exception:
@@ -385,7 +400,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
         import html as _html
         safe_model = _html.escape(model_name)
         header_html = f"{ts} | <b>{safe_model} reasoning...</b>"  # newline added below
-        self._log.moveCursor(QtGui.QTextCursor.MoveOperation.End)
+        # Force cursor to end to prevent user interference
+        self._force_cursor_to_end()
         try:
             # Start header at the beginning of a line
             self._ensure_line_start()
@@ -414,6 +430,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
             except Exception:
                 pass
             return
+        # Force cursor to end to prevent user interference
+        self._force_cursor_to_end()
         cursor = self._log.textCursor()
         # Save current format and apply italic only for this insertion
         prev_fmt = cursor.charFormat()
@@ -537,7 +555,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
             import html as _html
             safe_model = _html.escape(model_name)
             header_html = f"{ts} | <b>{safe_model}</b>: "
-            self._log.moveCursor(QtGui.QTextCursor.MoveOperation.End)
+            # Force cursor to end to prevent user interference
+            self._force_cursor_to_end()
             # Ensure we begin at the start of a line for the answer header
             self._ensure_line_start()
             # Ensure default formatting for answer header
@@ -546,6 +565,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
                 self._log.insertHtml(header_html)
             except Exception:
                 self._log.insertPlainText(f"{ts} | {model_name}: ")
+        # Force cursor to end again before inserting plain text
+        self._force_cursor_to_end()
         # Append the plain text portion
         self._reset_char_format()
         self._log.insertPlainText(text)

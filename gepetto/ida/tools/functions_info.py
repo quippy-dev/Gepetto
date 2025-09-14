@@ -5,6 +5,7 @@ import ida_kernwin
 import ida_funcs
 import ida_name
 import idaapi
+import idautils
 
 from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
@@ -91,7 +92,7 @@ def get_function_by_name(name: str) -> dict:
             ea = ida_name.get_name_ea(idaapi.BADADDR, name)
             if ea == idaapi.BADADDR:
                 # also try demangled map by scanning
-                for f_ea in ida_funcs.Functions():
+                for f_ea in idautils.Functions():
                     dem = idaapi.demangle_name(ida_name.get_name(f_ea), idaapi.MNG_NODEFINIT)
                     if dem and dem == name:
                         ea = f_ea
@@ -134,7 +135,9 @@ def get_function_by_address(address: str) -> dict:
 
 
 def get_current_address() -> str:
-    return hex(idaapi.get_screen_ea())
+    # Run on UI thread (IDA 9.x): get_screen_ea is main-thread-only
+    ea = ida_kernwin.execute_sync(ida_kernwin.get_screen_ea, ida_kernwin.MFF_FAST)
+    return hex(ea)
 
 
 def get_current_function() -> dict:
@@ -158,25 +161,51 @@ def get_current_function() -> dict:
 
 
 def list_functions(offset: int, count: int) -> dict:
-    funcs = list(ida_funcs.Functions())
-    items = [
-        _func_info(ida_funcs.get_func(ea)) for ea in funcs
-        if ida_funcs.get_func(ea) is not None
-    ]
-    if count == 0:
-        count = len(items)
-    next_offset = offset + count
-    if next_offset >= len(items):
-        next_offset = None
-    return {"ok": True, "data": items[offset: offset + count], "next_offset": next_offset}
+    # Run on UI thread (IDA 9.x): many IDA APIs are main-thread-only
+    out = {"ok": False}
+    
+    def _do():
+        try:
+            funcs = list(idautils.Functions())
+            items = [
+                _func_info(ida_funcs.get_func(ea)) for ea in funcs
+                if ida_funcs.get_func(ea) is not None
+            ]
+            if count == 0:
+                actual_count = len(items)
+            else:
+                actual_count = count
+            next_offset = offset + actual_count
+            if next_offset >= len(items):
+                next_offset = None
+            out.update({"ok": True, "data": items[offset: offset + actual_count], "next_offset": next_offset})
+            return 1
+        except Exception as e:
+            out.update({"error": str(e)})
+            return 0
+    
+    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    return out
 
 
 def get_entry_points() -> dict:
-    result = []
-    for i in range(ida_entry.get_entry_qty()):
-        ordinal = ida_entry.get_entry_ordinal(i)
-        address = ida_entry.get_entry(ordinal)
-        fn = ida_funcs.get_func(address)
-        if fn:
-            result.append(_func_info(fn))
-    return {"ok": True, "entries": result}
+    # Run on UI thread (IDA 9.x): many IDA APIs are main-thread-only
+    out = {"ok": False}
+    
+    def _do():
+        try:
+            result = []
+            for i in range(ida_entry.get_entry_qty()):
+                ordinal = ida_entry.get_entry_ordinal(i)
+                address = ida_entry.get_entry(ordinal)
+                fn = ida_funcs.get_func(address)
+                if fn:
+                    result.append(_func_info(fn))
+            out.update({"ok": True, "entries": result})
+            return 1
+        except Exception as e:
+            out.update({"error": str(e)})
+            return 0
+    
+    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    return out
