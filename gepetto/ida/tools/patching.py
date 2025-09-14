@@ -4,7 +4,7 @@ import ida_bytes
 import idautils
 import ida_kernwin
 
-from gepetto.ida.tools.function_utils import parse_ea
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_last_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 
 
@@ -32,6 +32,7 @@ def patch_address_assembles(address: str, assembles: str) -> dict:
     if not assembles:
         raise ValueError("assembles is required (semicolon separated)")
     ea = parse_ea(address)
+    touch_last_ea(ea)
     out = {"ok": False}
 
     def _do():
@@ -51,6 +52,6 @@ def patch_address_assembles(address: str, assembles: str) -> dict:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_WRITE)
+    run_on_main_thread(_do, write=True)
     return out
 

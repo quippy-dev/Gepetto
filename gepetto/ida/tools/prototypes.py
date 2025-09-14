@@ -4,7 +4,7 @@ import ida_kernwin
 import ida_typeinf
 import idaapi
 
-from gepetto.ida.tools.function_utils import parse_ea
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_last_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 
 
@@ -24,6 +24,7 @@ def set_function_prototype(function_address: str, prototype: str) -> dict:
     if not function_address or prototype is None:
         raise ValueError("function_address and prototype are required")
     ea = parse_ea(function_address)
+    touch_last_ea(ea)
     out = {"ok": False}
 
     def _do():
@@ -39,12 +40,12 @@ def set_function_prototype(function_address: str, prototype: str) -> dict:
             if not ida_typeinf.apply_tinfo(func.start_ea, tif, ida_typeinf.PT_SIL):
                 out.update(error="Failed to apply type")
                 return 0
-            out.update(ok=True, function_address=function_address, prototype=str(tif))
+            out.update(ok=True, function_address=int(ea), prototype=str(tif))
             return 1
         except Exception as e:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_WRITE)
+    run_on_main_thread(_do, write=True)
     return out
 

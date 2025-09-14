@@ -4,7 +4,7 @@ import ida_hexrays
 import ida_kernwin
 import idaapi
 
-from gepetto.ida.tools.function_utils import parse_ea
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_last_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 
 
@@ -22,6 +22,7 @@ def handle_set_comment_tc(tc, messages):
 
 def set_comment(address: str, comment: str) -> dict:
     ea = parse_ea(address)
+    touch_last_ea(ea)
     if comment is None:
         comment = ""
     out = {"ok": False}
@@ -40,12 +41,12 @@ def set_comment(address: str, comment: str) -> dict:
                         cfunc.refresh_func_ctext()
                 except Exception:
                     pass
-            out.update(ok=True, address=hex(ea), comment=comment)
+            out.update(ok=True, address=int(ea), comment=comment)
             return 1
         except Exception as e:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_WRITE)
+    run_on_main_thread(_do, write=True)
     return out
 

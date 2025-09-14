@@ -7,7 +7,7 @@ import ida_segment
 import idaapi
 import idc
 
-from gepetto.ida.tools.function_utils import parse_ea
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_last_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 
 
@@ -30,6 +30,7 @@ def disassemble_function(start_address: str) -> dict:
     
     try:
         start = parse_ea(start_address)
+        touch_last_ea(start)
         out = {"ok": False}
 
         def _do():
@@ -105,7 +106,7 @@ def disassemble_function(start_address: str) -> dict:
                             # Fallback to simple disassembly
                             instruction = idc.GetDisasm(address) or "<disasm error>"
 
-                        line = {"address": f"{address:#x}", "instruction": instruction}
+                        line = {"address": int(address), "instruction": instruction}
                         if comments:
                             line["comments"] = comments
                         if segment:
@@ -118,7 +119,7 @@ def disassemble_function(start_address: str) -> dict:
                         continue
 
                 # prototype info (best-effort)
-                rd = {"name": func.name, "start_ea": f"{func.start_ea:#x}", "stack_frame": [], "lines": lines}
+                rd = {"name": func.name, "start_ea": int(func.start_ea), "stack_frame": [], "lines": lines}
                 try:
                     proto = getattr(func, 'get_prototype', None)
                     if proto:
@@ -135,8 +136,7 @@ def disassemble_function(start_address: str) -> dict:
                 out.update(error=str(e))
                 return 0
 
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        if not run_on_main_thread(_do, write=False):
             if not out.get("error"):
                 out["error"] = "Failed to execute on main thread"
                 

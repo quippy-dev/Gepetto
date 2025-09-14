@@ -7,9 +7,10 @@ import ida_hexrays
 import ida_kernwin
 import ida_name
 
-from gepetto.ida.tools.function_utils import parse_ea, resolve_ea, resolve_func, get_func_name
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread
+from gepetto.ida.tools.function_utils import resolve_ea, resolve_func, get_func_name
 from gepetto.ida.tools.tools import add_result_to_messages
-from gepetto.ida.utils.ida9_utils import touch_last_ea
+from gepetto.ida.utils.ida9_utils import touch_last_ea, decompile_func
 
 
 def handle_get_function_code_tc(tc, messages):
@@ -42,26 +43,22 @@ def handle_get_function_code_tc(tc, messages):
 
 def _decompile_func(ea) -> str:
     """
-    Decompile with Hex-Rays on the UI thread and return pseudocode.
+    Decompile with central utility on the UI thread and return pseudocode.
     Raises ValueError if decompilation fails.
     """
     res = {"ok": False, "text": None, "err": None}
 
     def _do():
         try:
-            decompiled = ida_hexrays.decompile(ea)
-            if not decompiled:
-                res["ok"] = False
-                res["err"] = "Decompilation failed."
-                return 0
-            res["text"] = str(decompiled)
+            cfunc = decompile_func(ea)
+            res["text"] = str(cfunc)
             res["ok"] = True
             return 1
         except Exception as e:
             res["err"] = str(e)
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST)
+    run_on_main_thread(_do, write=False)
 
     if not res["ok"]:
         raise ValueError(res["err"] or "Unknown decompilation error.")
@@ -88,6 +85,8 @@ def get_function_code(ea: Optional[int] = None,
           "pseudocode": str | None
         }
     """
+    if ea is not None:
+        ea = parse_ea(ea)
     result = {
         "ok": False,
         "error": None,

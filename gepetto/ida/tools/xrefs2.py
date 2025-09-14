@@ -6,7 +6,7 @@ import idaapi
 import idautils
 import ida_idaapi
 
-from gepetto.ida.tools.function_utils import parse_ea
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_last_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 
 
@@ -36,6 +36,7 @@ def handle_get_xrefs_to_field_tc(tc, messages):
 
 def get_xrefs_to(address: str) -> dict:
     ea = parse_ea(address)
+    touch_last_ea(ea)
     out = {"ok": False}
 
     def _do():
@@ -43,7 +44,7 @@ def get_xrefs_to(address: str) -> dict:
             xs = []
             for xref in idautils.XrefsTo(ea):
                 xs.append({
-                    "address": hex(xref.frm),
+                    "address": int(xref.frm),
                     "type": "code" if xref.iscode else "data",
                     "function": _func_info(xref.frm),
                 })
@@ -53,7 +54,7 @@ def get_xrefs_to(address: str) -> dict:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
@@ -65,7 +66,7 @@ def _func_info(ea: int):
     if not name:
         import ida_funcs
         name = ida_funcs.get_func_name(fn.start_ea)
-    return {"address": hex(fn.start_ea), "name": name or "", "size": hex(fn.end_ea - fn.start_ea)}
+    return {"address": int(fn.start_ea), "name": name or "", "size": int(fn.end_ea - fn.start_ea)}
 
 
 def get_xrefs_to_field(struct_name: str, field_name: str) -> dict:
@@ -94,7 +95,7 @@ def get_xrefs_to_field(struct_name: str, field_name: str) -> dict:
             xs = []
             for xr in idautils.XrefsTo(tid):
                 xs.append({
-                    "address": hex(xr.frm),
+                    "address": int(xr.frm),
                     "type": "code" if xr.iscode else "data",
                     "function": _func_info(xr.frm),
                 })
@@ -104,5 +105,5 @@ def get_xrefs_to_field(struct_name: str, field_name: str) -> dict:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out

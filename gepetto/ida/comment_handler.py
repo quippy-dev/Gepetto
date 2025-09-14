@@ -8,6 +8,7 @@ import idaapi
 import ida_hexrays
 import ida_kernwin
 import idc
+from gepetto.ida.utils.ida9_utils import safe_get_screen_ea, run_on_main_thread, touch_last_ea, decompile_func
 
 import gepetto.config
 from gepetto.ida.status_panel import panel as STATUS
@@ -29,8 +30,33 @@ class CommentHandler(idaapi.action_handler_t):
     def activate(self, ctx):
         start_time = time.time()
         localization_locale = gepetto.config.get_localization_locale()
-        decompiler_output = ida_hexrays.decompile(idaapi.get_screen_ea())
-        
+        # Resolve EA safely and decompile on the main thread
+        ea = safe_get_screen_ea()
+        if ea == idaapi.BADADDR:
+            try:
+                ida_kernwin.warning(_("No focused view: returning BADADDR. Provide EA explicitly or call an operation that sets last_ea."))
+            except Exception:
+                pass
+            return 1
+        touch_last_ea(ea)
+
+        _out = {"cfunc": None, "err": None}
+        def _do():
+            try:
+                _out["cfunc"] = decompile_func(ea)
+                return 1
+            except Exception as e:
+                _out["err"] = str(e)
+                return 0
+        run_on_main_thread(_do, write=False)
+        if not _out["cfunc"]:
+            try:
+                ida_kernwin.warning(_out["err"] or _("Hex-Rays not available: install/enable the Hex-Rays Decompiler."))
+            except Exception:
+                pass
+            return 1
+        decompiler_output = _out["cfunc"]
+
         pseudocode_lines = get_commentable_lines(decompiler_output)
         formatted_lines = format_commentable_lines(pseudocode_lines)
         v = ida_hexrays.get_widget_vdui(ctx.widget)
@@ -98,19 +124,28 @@ def comment_callback(decompiler_output, pseudocode_lines, view, response, start_
             return
         pairs = [(int(line), comment) for line, comment in items.items()]
 
-        for line, comment in pairs:
-            comment_address = pseudocode_lines[line][2]  # Get the comment address
-            comment_placement = pseudocode_lines[line][3]  # Get the comment placement
-            target = idaapi.treeloc_t()
-            target.ea = comment_address
-            target.itp = comment_placement
-            decompiler_output.set_user_cmt(target, comment)
+        def _apply_comments():
+            try:
+                for line, comment in pairs:
+                    comment_address = pseudocode_lines[line][2]  # Get the comment address
+                    comment_placement = pseudocode_lines[line][3]  # Get the comment placement
+                    if comment_address is None:
+                        continue
+                    target = idaapi.treeloc_t()
+                    target.ea = comment_address
+                    target.itp = comment_placement
+                    decompiler_output.set_user_cmt(target, comment)
 
-        decompiler_output.save_user_cmts()
-        decompiler_output.del_orphan_cmts()
+                decompiler_output.save_user_cmts()
+                decompiler_output.del_orphan_cmts()
 
-        if view:
-            view.refresh_view(True)
+                if view:
+                    view.refresh_view(True)
+                return 1
+            except Exception:
+                return 0
+
+        run_on_main_thread(_apply_comments, write=True)
 
         print(_("{model} query finished in {time:.2f} seconds!").format(
             model=str(gepetto.config.model), time=elapsed_time))

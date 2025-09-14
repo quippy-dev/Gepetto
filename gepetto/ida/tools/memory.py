@@ -4,7 +4,7 @@ import ida_bytes
 import ida_kernwin
 import idaapi
 
-from gepetto.ida.tools.function_utils import parse_ea
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread
 from gepetto.ida.tools.tools import add_result_to_messages
 from gepetto.ida.utils.ida9_utils import touch_last_ea
 
@@ -26,7 +26,7 @@ def handle_read_memory_bytes_tc(tc, messages):
         def _do():
             out["data"] = ida_bytes.get_bytes(addr, size) or b""
             return 1
-        ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+        run_on_main_thread(_do, write=False)
         
         data = out["data"]
         result = {"ok": True, "bytes": " ".join(f"{x:#02x}" for x in data)}
@@ -50,7 +50,7 @@ def _simple_read(tc, messages, reader_name: str):
             reader = getattr(ida_bytes, reader_name)
             out["value"] = int(reader(ea))
             return 1
-        ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+        run_on_main_thread(_do, write=False)
         
         result = {"ok": True, "value": out["value"]}
     except Exception as ex:
@@ -78,14 +78,13 @@ def handle_data_read_qword_tc(tc, messages):
     try:
         ea = parse_ea(args.get("address"))
         touch_last_ea(ea)
-        touch_last_ea(ea)
         
         # Run on UI thread (IDA 9.x): many IDA APIs are main-thread-only
         out = {"value": None}
         def _do():
             out["value"] = ida_bytes.get_qword(ea)
             return 1
-        ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+        run_on_main_thread(_do, write=False)
         
         result = {"ok": True, "value": int(out["value"])}
     except Exception as ex:
@@ -100,13 +99,14 @@ def handle_data_read_string_tc(tc, messages):
         args = {}
     try:
         ea = parse_ea(args.get("address"))
+        touch_last_ea(ea)
         
         # Run on UI thread (IDA 9.x): many IDA APIs are main-thread-only
         out = {"data": None}
         def _do():
             out["data"] = idaapi.get_strlit_contents(ea, -1, 0)
             return 1
-        ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+        run_on_main_thread(_do, write=False)
         
         s = out["data"]
         result = {"ok": True, "value": s.decode("utf-8") if s else ""}

@@ -4,6 +4,7 @@ import ida_kernwin
 import idaapi
 
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import run_on_main_thread
 
 
 def handle_get_metadata_tc(tc, messages):
@@ -41,5 +42,5 @@ def get_metadata() -> dict:
         })
         return 1
     
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out

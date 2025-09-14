@@ -3,7 +3,6 @@ import json
 import ida_frame
 import ida_funcs
 import ida_kernwin
-import ida_struct
 import ida_typeinf
 import idaapi
 

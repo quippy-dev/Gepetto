@@ -3,6 +3,7 @@ import json
 import ida_kernwin
 
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import run_on_main_thread
 
 
 def handle_refresh_view_tc(tc, messages):
@@ -32,7 +33,7 @@ def refresh_view() -> dict:
             out["error"] = str(e)
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST)
+    run_on_main_thread(_do, write=False)
 
     if not out["ok"]:
         raise ValueError(out.get("error", "Failed to refresh view"))

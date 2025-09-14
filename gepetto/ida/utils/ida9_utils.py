@@ -306,3 +306,56 @@ def validate_function_ea(ea: int):
     if not func:
         raise ValueError(f"EA {ea_to_hex(ea)} is not inside a function.")
     return func
+
+def enumerate_symbols():
+    """
+    Enumerate all named symbols (functions and global variables) on the IDA main thread.
+
+    Returns:
+        list[dict]: Each entry is:
+            {"name": str, "ea": int, "kind": "function" | "global"}
+
+    Notes:
+    - Iterates idautils.Names() on the main thread for IDA 9.x safety.
+    - A symbol is considered a "function" only if its EA is the function start EA.
+      Any named item not at a function start is considered a "global".
+    """
+    symbols = []
+
+    def _do():
+        nonlocal symbols
+        try:
+            import idautils  # type: ignore
+            import ida_funcs as _ida_funcs  # type: ignore
+            import ida_name as _ida_name  # type: ignore
+        except Exception:
+            # Not running under IDA or imports failed; return empty
+            symbols = []
+            return 1
+
+        try:
+            seen = set()
+            for ea, name in idautils.Names():
+                try:
+                    iea = int(ea)
+                except Exception:
+                    continue
+
+                # De-duplicate by EA; keep first occurrence
+                if iea in seen:
+                    continue
+                seen.add(iea)
+
+                func = _ida_funcs.get_func(iea) if _ida_funcs else None
+                is_func_start = bool(func and getattr(func, "start_ea", None) == iea)
+                kind = "function" if is_func_start else "global"
+
+                sym_name = name or (_ida_name.get_ea_name(iea) if _ida_name else "") or ""
+                symbols.append({"name": sym_name, "ea": iea, "kind": kind})
+        except Exception:
+            # Best-effort enumeration; swallow to keep tool robust
+            pass
+        return 1
+
+    run_on_main_thread(_do, write=False)
+    return symbols

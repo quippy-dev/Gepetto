@@ -13,6 +13,7 @@ import idaapi
 import ida_strlist
 
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import run_on_main_thread
 
 
 # -----------------------------------------------------------------------------
@@ -98,8 +99,7 @@ def _snapshot_strings_and_segments():
     """Runs on UI thread: safely snapshot strings and segments for background use.
 
     Notes:
-      - Assumes caller wrapped this in ida_kernwin.execute_sync(..., MFF_WRITE)
-        because build_strlist() mutates IDA state.
+      - Runs on the main thread via run_on_main_thread(..., write=True) because build_strlist() mutates IDA state.
       - Always returns a 2-tuple: (strings: list[dict], segs: list[tuple[int,int]]).
     """
     try:
@@ -152,7 +152,7 @@ def _ui_snapshot_wrapper():
             res = ([], [])
         snap["strings"], snap["segs"] = res
         return 1
-    ida_kernwin.execute_sync(_ui_snapshot, ida_kernwin.MFF_WRITE)
+    run_on_main_thread(_ui_snapshot, write=True)
     return snap
 
 # -----------------------------------------------------------------------------

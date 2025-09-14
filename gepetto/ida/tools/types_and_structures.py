@@ -2,6 +2,7 @@ import json
 
 import ida_kernwin
 import ida_typeinf
+from gepetto.ida.utils.ida9_utils import run_on_main_thread, touch_last_ea
 
 from gepetto.ida.tools.tools import add_result_to_messages
 
@@ -116,7 +117,7 @@ def list_local_types() -> dict:
             out.update({"error": str(e)})
             return 0
     
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
@@ -139,7 +140,7 @@ def declare_c_type(c_declaration: str) -> dict:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_WRITE)
+    run_on_main_thread(_do, write=True)
     return out
 
 
@@ -174,7 +175,7 @@ def get_defined_structures() -> dict:
             out.update({"error": str(e)})
             return 0
     
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 
@@ -227,8 +228,7 @@ def analyze_struct_detailed(name: str) -> dict:
                 result.update(error=str(e))
                 return 0
         
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        if not run_on_main_thread(_do, write=False):
             if not result.get("error"):
                 result["error"] = "Failed to execute on main thread"
                 
@@ -281,8 +281,7 @@ def get_struct_info_simple(name: str) -> dict:
                 result.update(error=str(e))
                 return 0
         
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        if not run_on_main_thread(_do, write=False):
             if not result.get("error"):
                 result["error"] = "Failed to execute on main thread"
                 
@@ -298,13 +297,14 @@ def get_struct_at_address(address: str, struct_name: str) -> dict:
     try:
         import idaapi as _idaapi
         import ida_ida
-        from gepetto.ida.tools.function_utils import parse_ea as _parse_ea
+        from gepetto.ida.utils.ida9_utils import parse_ea as _parse_ea
         
         result = {"ok": False}
         
         def _do():
             try:
                 addr = _parse_ea(address)
+                touch_last_ea(addr)
                 tif = ida_typeinf.tinfo_t()
                 if not tif.get_named_type(None, struct_name):
                     result.update(error=f"Structure '{struct_name}' not found")
@@ -315,7 +315,7 @@ def get_struct_at_address(address: str, struct_name: str) -> dict:
                     result.update(error="Failed to get structure details")
                     return 0
                     
-                struct_info = {"struct_name": struct_name, "address": f"0x{addr:X}", "members": []}
+                struct_info = {"struct_name": struct_name, "address": int(addr), "members": []}
                 for member in udt_data:
                     try:
                         offset = member.begin() // 8
@@ -372,8 +372,7 @@ def get_struct_at_address(address: str, struct_name: str) -> dict:
                 result.update(error=str(e))
                 return 0
         
-        # Use MFF_FAST for better compatibility
-        if not ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST):
+        if not run_on_main_thread(_do, write=False):
             if not result.get("error"):
                 result["error"] = "Failed to execute on main thread"
                 
@@ -413,5 +412,5 @@ def search_structures(filter_text: str) -> dict:
             out.update({"error": str(e)})
             return 0
     
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out

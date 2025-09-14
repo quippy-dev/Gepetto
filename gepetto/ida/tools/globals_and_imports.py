@@ -10,7 +10,7 @@ import ida_typeinf
 from gepetto.ida.tools.tools import add_result_to_messages
 from gepetto.ida.utils.ida9_utils import (
     parse_ea, run_on_main_thread, parse_type_declaration, get_candidates_for_name,
-    ea_to_hex, touch_last_ea
+    ea_to_hex, touch_last_ea, enumerate_symbols
 )
 
 
@@ -104,30 +104,24 @@ def handle_get_global_variable_value_at_address_tc(tc, messages):
 # ----------------------------------------------------------------------------
 
 def list_globals(offset: int, count: int) -> dict:
-    # Run on UI thread (IDA 9.x): many IDA APIs are main-thread-only
-    out = {"ok": False}
-    
-    def _do():
-        try:
-            items = []
-            for addr, name in idautils.Names():
-                if not idaapi.get_func(addr):
-                    items.append({"address": hex(addr), "name": name})
-            if count == 0:
-                actual_count = len(items)
-            else:
-                actual_count = count
-            next_offset = offset + actual_count
-            if next_offset >= len(items):
-                next_offset = None
-            out.update({"ok": True, "data": items[offset: offset + actual_count], "next_offset": next_offset})
-            return 1
-        except Exception as e:
-            out.update({"error": str(e)})
-            return 0
-    
-    run_on_main_thread(_do, write=False)
-    return out
+    """
+    List global symbols with pagination. Returns EAs as integers.
+
+    Delegates enumeration to ida9_utils.enumerate_symbols() to ensure main-thread execution.
+    """
+    try:
+        syms = enumerate_symbols()
+        globals_list = [{"name": s["name"], "ea": int(s["ea"])} for s in syms if s.get("kind") == "global"]
+
+        total = len(globals_list)
+        actual_count = total if count == 0 else count
+        next_offset = offset + actual_count
+        if next_offset >= total:
+            next_offset = None
+
+        return {"ok": True, "data": globals_list[offset: offset + actual_count], "next_offset": next_offset}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def list_globals_filter(offset: int, count: int, flt: str) -> dict:
@@ -322,6 +316,7 @@ def get_global_variable_value_by_name(variable_name: str) -> str:
 
 def get_global_variable_value_internal(ea: int) -> str:
     # Enhanced error handling and thread safety
+    touch_last_ea(ea)
     result = {"value": None, "error": None}
     
     def _do():

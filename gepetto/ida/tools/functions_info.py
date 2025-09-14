@@ -7,10 +7,9 @@ import ida_name
 import idaapi
 import idautils
 
-from gepetto.ida.tools.function_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 from gepetto.ida.utils.ida9_utils import (
-    safe_get_current_address, ea_to_hex, touch_last_ea, run_on_main_thread
+    parse_ea, safe_get_current_address, ea_to_hex, touch_last_ea, run_on_main_thread
 )
 
 
@@ -82,7 +81,7 @@ def handle_get_entry_points_tc(tc, messages):
 
 def _func_info(fn: ida_funcs.func_t) -> dict:
     name = ida_funcs.get_func_name(fn.start_ea) or ida_name.get_ea_name(fn.start_ea) or ""
-    return {"address": hex(fn.start_ea), "name": name, "size": hex(fn.end_ea - fn.start_ea)}
+    return {"address": int(fn.start_ea), "name": name, "size": int(fn.end_ea - fn.start_ea)}
 
 
 def get_function_by_name(name: str) -> dict:
@@ -107,6 +106,7 @@ def get_function_by_name(name: str) -> dict:
             if not fn:
                 out.update(error=f"Symbol found but not inside a function: {name}")
                 return 0
+            touch_last_ea(ea)
             out.update(ok=True, **_func_info(fn))
             return 1
         except Exception as e:
@@ -127,6 +127,7 @@ def get_function_by_address(address: str) -> dict:
             if not fn:
                 out.update(error=f"No function found at {hex(ea)}")
                 return 0
+            touch_last_ea(ea)
             out.update(ok=True, **_func_info(fn))
             return 1
         except Exception as e:

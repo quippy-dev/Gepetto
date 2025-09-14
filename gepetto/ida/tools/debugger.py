@@ -8,7 +8,7 @@ import ida_bytes
 import ida_name
 import idaapi
 
-from gepetto.ida.tools.function_utils import parse_ea
+from gepetto.ida.utils.ida9_utils import parse_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 
 
@@ -119,7 +119,7 @@ def dbg_get_call_stack() -> dict:
         if not ida_dbg.collect_stack_trace(tid, trace):
             return {"ok": True, "frames": []}
         for frame in trace:
-            frame_info = {"address": hex(frame.callea)}
+            frame_info = {"address": int(frame.callea)}
             try:
                 module_info = ida_idd.modinfo_t()
                 if ida_dbg.get_module_info(frame.callea, module_info):
@@ -145,7 +145,7 @@ def dbg_list_breakpoints() -> dict:
         bpt = ida_dbg.bpt_t()
         if ida_dbg.get_bpt(ea, bpt):
             breakpoints.append({
-                "ea": hex(bpt.ea),
+                "ea": int(bpt.ea),
                 "type": int(bpt.type),
                 "enabled": bool(bpt.flags & ida_dbg.BPT_ENABLED),
                 "condition": bpt.condition if bpt.condition else None,

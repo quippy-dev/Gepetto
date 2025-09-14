@@ -5,8 +5,9 @@ import ida_kernwin
 import ida_lines
 import idaapi
 
-from gepetto.ida.tools.function_utils import parse_ea
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_last_ea
 from gepetto.ida.tools.tools import add_result_to_messages
+from gepetto.ida.utils.ida9_utils import decompile_func as ida9_decompile_func
 
 
 def handle_decompile_function_tc(tc, messages):
@@ -24,20 +25,8 @@ def handle_decompile_function_tc(tc, messages):
 
 
 def _decompile_checked(func_ea: int):
-    if not ida_hexrays.init_hexrays_plugin():
-        raise RuntimeError("Hex-Rays decompiler is not available")
-    err = ida_hexrays.hexrays_failure_t()
-    cfunc = ida_hexrays.decompile_func(func_ea, err, ida_hexrays.DECOMP_WARNINGS)
-    if not cfunc:
-        if err.code == ida_hexrays.MERR_LICENSE:
-            raise RuntimeError("Decompiler licence is not available. Use disassemble_function instead.")
-        msg = f"Decompilation failed at {func_ea:#x}"
-        if err.str:
-            msg += f": {err.str}"
-        if getattr(err, "errea", idaapi.BADADDR) != idaapi.BADADDR:
-            msg += f" (address: {err.errea:#x})"
-        raise RuntimeError(msg)
-    return cfunc
+    # Delegate to centralized utility for consistent error handling and diagnostics
+    return ida9_decompile_func(func_ea)
 
 
 def decompile_function(address: str) -> dict:
@@ -49,6 +38,7 @@ def decompile_function(address: str) -> dict:
     def _do():
         try:
             ea = parse_ea(address)
+            touch_last_ea(ea)
             cfunc = _decompile_checked(ea)
             try:
                 ida_hexrays.open_pseudocode(ea, ida_hexrays.OPF_REUSE)
@@ -83,5 +73,7 @@ def decompile_function(address: str) -> dict:
             out.update(error=str(e))
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    if not run_on_main_thread(_do, write=False):
+        if not out.get("error"):
+            out["error"] = "Failed to execute on main thread"
     return out

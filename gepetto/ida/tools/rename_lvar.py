@@ -4,7 +4,8 @@ from typing import Optional
 import ida_hexrays
 import ida_kernwin
 
-from gepetto.ida.tools.function_utils import parse_ea, resolve_ea, resolve_func, get_func_name
+from gepetto.ida.utils.ida9_utils import parse_ea
+from gepetto.ida.tools.function_utils import resolve_ea, resolve_func, get_func_name
 from gepetto.ida.tools.tools import add_result_to_messages
 from gepetto.ida.utils.ida9_utils import hexrays_available, decompile_func, run_on_main_thread, touch_last_ea
 
@@ -44,6 +45,8 @@ def rename_lvar(
     if not old_name or not new_name:
         raise ValueError("old_name and new_name are required")
 
+    if ea is not None:
+        ea = parse_ea(ea)
     f = resolve_func(ea=ea, name=func_name)
     func_name = func_name or get_func_name(f)
     if ea is None:

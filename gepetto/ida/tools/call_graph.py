@@ -10,7 +10,8 @@ import ida_name
 import ida_xref
 import ida_bytes
 
-from gepetto.ida.tools.function_utils import parse_ea, resolve_func, get_func_name
+from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_last_ea
+from gepetto.ida.tools.function_utils import resolve_func, get_func_name
 from gepetto.ida.tools.tools import add_result_to_messages
 
 # Compatibility with older IDA versions where is_thunk_func is available
@@ -163,6 +164,8 @@ def get_callers(ea: Optional[int] = None, name: Optional[str] = None,
     Only call xrefs are considered. If include_thunks is True and the target is a thunk,
     results will be keyed to the thunk's final target for normalization.
     """
+    if ea is not None:
+        ea = parse_ea(ea)
     out = {"ok": False, "target": {}, "callers": [], "error": None}
 
     def _do():
@@ -183,6 +186,7 @@ def get_callers(ea: Optional[int] = None, name: Optional[str] = None,
                 "ea": int(norm_target_ea),
                 "name": norm_target_name,
             }
+            touch_last_ea(norm_target_ea)
 
             # Collect callers: code xrefs TO the (possibly normalized) callee start
             callee_start = norm_target_ea
@@ -207,7 +211,7 @@ def get_callers(ea: Optional[int] = None, name: Optional[str] = None,
             out["error"] = str(e)
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
 
 # -----------------------------------------------------------------------------
@@ -219,6 +223,8 @@ def get_callees(ea: Optional[int] = None, name: Optional[str] = None,
     - only_direct=True: only consider direct code call xrefs (ignore data/indirect).
     - include_thunks=True: normalize callees that are thunks to their ultimate targets.
     """
+    if ea is not None:
+        ea = parse_ea(ea)
     out = {"ok": False, "source": {}, "callees": [], "error": None}
 
     def _do():
@@ -229,6 +235,7 @@ def get_callees(ea: Optional[int] = None, name: Optional[str] = None,
             fn = resolve_func(ea=ea if ea is not None else None,
                               name=name if name else None)
             src_ea = fn.start_ea
+            touch_last_ea(src_ea)
             out["source"] = {"ea": int(src_ea), "name": _func_name(src_ea)}
 
             # Walk each item in the function and gather outgoing call xrefs
@@ -259,5 +266,5 @@ def get_callees(ea: Optional[int] = None, name: Optional[str] = None,
             out["error"] = str(e)
             return 0
 
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_READ)
+    run_on_main_thread(_do, write=False)
     return out
