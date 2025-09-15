@@ -29,6 +29,9 @@ class GPT(LanguageModel):
     # Default adapter is Chat Completions. The first‑party OpenAI provider
     # (this class) promotes itself to Responses API in __init__.
     use_responses_api: bool = False
+    # If streaming is rejected due to org/model policy (e.g.,
+    # "Organization is not Verified"), remember and avoid streaming next time
+    # for restricted models, falling back to a non‑streaming request.
     oai_org_unverified = False
     oai_restricted_models = OPENAI_RESTRICTED_MODELS
 
@@ -85,6 +88,8 @@ class GPT(LanguageModel):
         self._cancel_lock = threading.Lock()
         self._cancel_ev: threading.Event | None = None
         self._active_stream_ctx = None
+        # Emit the preemptive fallback notice only once per model instance
+        self._fallback_notice_sent = False
 
     def __str__(self):
         return self.model
@@ -262,6 +267,61 @@ class GPT(LanguageModel):
         if isinstance(rf, dict) and rf.get("type") == "json_object":
             opts["response_format"] = {"type": "json_object"}
 
+        # Helper to inform the UI that we are falling back to non‑streaming and will disable reasoning summaries.
+        def _emit_fallback_notice(why: str, disable_reasoning: bool = True):
+            try:
+                msg = _(
+                    "Streaming fallback: {why}. Switching to non‑streaming mode. Latency may be higher; reasoning summaries will be disabled."
+                ).format(why=str(why)) if disable_reasoning else _(
+                    "Streaming fallback: {why}. Switching to non‑streaming mode. Latency may be higher."
+                ).format(why=str(why))
+                cb({"status": "fallback", "text": msg}, None)
+            except Exception:
+                pass
+
+        # Local fallback that retries without streaming and adapts output to
+        # the streaming-style callback conventions used across the app.
+        def _fallback_chat_no_stream():
+            opts_local = dict(opts)
+            # Remove any reasoning remnants just in case (Chat API ignores it, but be safe)
+            opts_local.pop("reasoning", None)
+            try:
+                resp = self.client.chat.completions.create(
+                    model=self.api_model,
+                    messages=messages,
+                    tools=tools,
+                    stream=False,
+                    **opts_local,
+                )
+            except Exception as _e:
+                print(_("Exception encountered while retrying without streaming: {error}").format(error=str(_e)))
+                return
+
+            # Build a pseudo response object to keep callers happy
+            choice = resp.choices[0] if getattr(resp, "choices", None) else None
+            text = (getattr(choice.message, "content", None) if choice else None) or ""
+            tcs = getattr(choice.message, "tool_calls", None) or []
+            # Stream text first (if present), then deliver the final object so the
+            # tool call handlers can run.
+            if text:
+                try:
+                    cb(text, None)
+                except Exception:
+                    pass
+            pseudo = self._finalize_chat_to_pseudo_response(text, tcs)
+            try:
+                cb(response=pseudo)
+            except Exception:
+                pass
+
+        # Preemptively avoid streaming for orgs/models that we know will reject it
+        if stream and self.oai_org_unverified and (self.api_model in self.oai_restricted_models):
+            if not self._fallback_notice_sent:
+                _emit_fallback_notice(_("Previously detected org/model streaming restriction"))
+                self._fallback_notice_sent = True
+            _fallback_chat_no_stream()
+            return
+
         try:
             if not stream:
                 resp = self.client.chat.completions.create(
@@ -356,6 +416,18 @@ class GPT(LanguageModel):
                 with self._cancel_lock:
                     self._active_stream_ctx = None
                 return
+        except openai.BadRequestError as e:
+            # Fallback: some orgs/models do not allow streaming yet.
+            emsg = str(e)
+            lower = emsg.lower()
+            if stream and ("param': 'stream" in lower or '"param": "stream"' in lower or "unsupported" in lower or "must be verified" in lower):
+                print(_("Unable to query in streaming mode: {error}\nFalling back and retrying!").format(error=emsg))
+                self.oai_org_unverified = True
+                _emit_fallback_notice(emsg)
+                _fallback_chat_no_stream()
+                return
+            # Otherwise, propagate as a general exception path below
+            print(_("General exception encountered while running the query: {error}").format(error=str(e)))
         except Exception as e:
             try:
                 if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
@@ -476,6 +548,80 @@ class GPT(LanguageModel):
             r = opts.get("reasoning", {}) if isinstance(opts.get("reasoning"), dict) else {}
             r["effort"] = self.reasoning_effort_override
             opts["reasoning"] = r
+
+        # If we've detected that this org/model combination disallows streaming,
+        # it also disallows reasoning summaries. Drop the reasoning field entirely.
+        if self.oai_org_unverified:
+            opts.pop("reasoning", None)
+
+        # Helper to inform the UI that we are falling back to non‑streaming and will disable reasoning summaries.
+        def _emit_fallback_notice(why: str, disable_reasoning: bool = True):
+            try:
+                msg = _(
+                    "Streaming fallback: {why}. Switching to non‑streaming mode. Latency may be higher; reasoning summaries will be disabled."
+                ).format(why=str(why)) if disable_reasoning else _(
+                    "Streaming fallback: {why}. Switching to non‑streaming mode. Latency may be higher."
+                ).format(why=str(why))
+                cb({"status": "fallback", "text": msg}, None)
+            except Exception:
+                pass
+
+        # Local fallback for Responses API: retry without streaming and adapt
+        def _fallback_responses_no_stream():
+            local_opts = dict(opts)
+            # Remove reasoning for orgs/models that don't permit it (e.g., unverified org)
+            local_opts.pop("reasoning", None)
+            try:
+                resp = self.client.responses.create(
+                    model=self.api_model,
+                    input=input_items if len(input_items) > 0 else None,
+                    instructions=instructions,
+                    **local_opts,
+                )
+            except Exception as _e:
+                print(_("Exception encountered while retrying without streaming: {error}").format(error=str(_e)))
+                return
+
+            # Approximate streaming by emitting the full textual output first,
+            # then deliver the final object for tool handling.
+            try:
+                # Prefer the SDK's aggregated property if available
+                agg = getattr(resp, "output_text", None)
+                if isinstance(agg, str) and agg:
+                    cb(agg, None)
+                else:
+                    text_chunks = []
+                    outputs = getattr(resp, "output", None) or []
+                    for item in outputs:
+                        itype = getattr(item, "type", None) or (item.get("type") if isinstance(item, dict) else None)
+                        if itype != "output_text":
+                            continue
+                        parts = getattr(item, "content", None) or (item.get("content") if isinstance(item, dict) else None)
+                        if isinstance(parts, list):
+                            for p in parts:
+                                txt = getattr(p, "text", None) or (p.get("text") if isinstance(p, dict) else None)
+                                if isinstance(txt, str) and txt:
+                                    text_chunks.append(txt)
+                    if text_chunks:
+                        cb("".join(text_chunks), None)
+            except Exception:
+                pass
+
+            # Deliver final object last so tooling/UI can inspect it and handle any tool calls
+            try:
+                cb(response=resp)
+            except Exception:
+                pass
+
+        # Preemptively avoid streaming if we already know the org/model combo rejects it
+        if stream and self.oai_org_unverified and (self.api_model in self.oai_restricted_models):
+            # Also drop reasoning to avoid 400s like "must be verified to generate reasoning summaries"
+            opts.pop("reasoning", None)
+            if not self._fallback_notice_sent:
+                _emit_fallback_notice(_("Previously detected org/model streaming restriction"))
+                self._fallback_notice_sent = True
+            _fallback_responses_no_stream()
+            return
 
         try:
             if not stream:
@@ -610,11 +756,35 @@ class GPT(LanguageModel):
                         self._active_stream_ctx = None
                     return
         except openai.BadRequestError as e:
-            m = re.search(r'maximum context length is \d+ tokens, however you requested \d+ tokens', str(e))
+            # Fallback: some orgs/models do not allow streaming yet or reasoning summaries are gated.
+            emsg = str(e)
+            lower = emsg.lower()
+            if stream and ("param': 'stream" in lower or '"param": "stream"' in lower or "unsupported" in lower or "verify organization" in lower or "must be verified" in lower or "organization is not verified" in lower):
+                print(_("Unable to query in streaming mode: {error}\nFalling back and retrying!").format(error=emsg))
+                self.oai_org_unverified = True
+                # Drop reasoning for unverified orgs before retrying
+                opts.pop("reasoning", None)
+                _emit_fallback_notice(emsg)
+                _fallback_responses_no_stream()
+                return
+            # Reasoning summaries not permitted: retry once without reasoning
+            if ("reasoning" in lower) or ("reasoning.summary" in lower):
+                try:
+                    print(_("Reasoning not permitted for this org/model; retrying without reasoning."))
+                except Exception:
+                    pass
+                opts.pop("reasoning", None)
+                try:
+                    cb({"status": "notice", "text": _("Reasoning summaries are disabled for this org/model; continuing without reasoning.")}, None)
+                except Exception:
+                    pass
+                _fallback_responses_no_stream()
+                return
+            m = re.search(r'maximum context length is \d+ tokens, however you requested \d+ tokens', emsg)
             if m:
                 msg = _("Unfortunately, this function is too big to be analyzed with the model's current API limits.")
             else:
-                msg = _("General exception encountered while running the query: {error}").format(error=e)
+                msg = _("General exception encountered while running the query: {error}").format(error=emsg)
             try:
                 if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
                     with self._cancel_lock:

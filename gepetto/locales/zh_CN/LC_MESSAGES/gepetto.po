@@ -10,7 +10,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Gepetto 1.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-09-14 22:15-0600\n"
+"POT-Creation-Date: 2025-09-15 01:33-0600\n"
 "PO-Revision-Date: 2025-04-12 23:15+0800\n"
 "Last-Translator: jindaxia, 2025\n"
 "Language-Team: Chinese (China) (https://app.transifex.com/gepetto/teams/"
@@ -44,32 +44,142 @@ msgid ""
 "{section}!"
 msgstr "警告：Gepetto 配置文件的 {section} 章节中缺少 {option} 选项！"
 
-#: gepetto/ida/cli.py:50
+#: gepetto/ida/cli.py:69
 msgid "LLM chat"
 msgstr "LLM 对话"
 
-#: gepetto/ida/comment_handler.py:57 gepetto/ida/handlers.py:112
-#: gepetto/ida/handlers.py:235 gepetto/ida/handlers.py:305
-#: gepetto/ida/handlers.py:358
+#: gepetto/ida/cli.py:80
+msgid "Waiting for model..."
+msgstr "Waiting for model..."
+
+#: gepetto/ida/cli.py:95
+#, fuzzy, python-brace-format
+msgid "Failed to make status panel visible: {error}"
+msgstr "Failed to make status panel visible: {error}"
+
+#: gepetto/ida/cli.py:229
+#, python-brace-format
+msgid "Thought signatures: {count} present; first={first}…"
+msgstr "Thought signatures: {count} present; first={first}…"
+
+#: gepetto/ida/cli.py:231
+msgid "Thought signatures: none present in this turn"
+msgstr "Thought signatures: none present in this turn"
+
+#: gepetto/ida/cli.py:241
+#, python-brace-format
+msgid "Tool calls requested: {count}"
+msgstr "Tool calls requested: {count}"
+
+#: gepetto/ida/cli.py:262
+#, python-brace-format
+msgid "→ Tool: {tool_name}({tool_args}...)"
+msgstr "→ Tool: {tool_name}({tool_args}...)"
+
+#: gepetto/ida/cli.py:263
+#, python-brace-format
+msgid "Running tool: {tool_name}"
+msgstr "Running tool: {tool_name}"
+
+#: gepetto/ida/cli.py:419
+msgid "Continuing after tools..."
+msgstr "Continuing after tools..."
+
+#: gepetto/ida/cli.py:434
+#, python-brace-format
+msgid "Thinking Summary: {summary}"
+msgstr "Thinking Summary: {summary}"
+
+#: gepetto/ida/cli.py:458 gepetto/ida/cli.py:702
+msgid "✔ Completed turn"
+msgstr "✔ Completed turn"
+
+#: gepetto/ida/cli.py:585
+msgid ""
+"Streaming fallback activated: switching to non‑streaming mode. Latency may "
+"be higher and reasoning summaries will be disabled."
+msgstr ""
+"Streaming fallback activated: switching to non‑streaming mode. Latency may "
+"be higher and reasoning summaries will be disabled."
+
+#: gepetto/ida/cli.py:586
+msgid "Fallback (no streaming)"
+msgstr "Fallback (no streaming)"
+
+#. try:
+#. STATUS.summary_stream_start(model_name)
+#. except Exception:
+#. pass
+#: gepetto/ida/cli.py:596
+#, fuzzy
+msgid "Reasoning..."
+msgstr "Reasoning..."
+
+#: gepetto/ida/cli.py:597 gepetto/ida/status_panel.py:275
+msgid "Reasoning"
+msgstr "Reasoning"
+
+#: gepetto/ida/cli.py:690
+msgid "Error"
+msgstr "Error"
+
+#: gepetto/ida/cli.py:735
+#, python-brace-format
+msgid ""
+"Sending thought signatures: total={total} across {assistants} assistant "
+"turns; last={last}; first={first_b64}…"
+msgstr ""
+"Sending thought signatures: total={total} across {assistants} assistant "
+"turns; last={last}; first={first_b64}…"
+
+#: gepetto/ida/cli.py:737
+msgid "Sending thought signatures: total=0 (none across assistant history)"
+msgstr "Sending thought signatures: total=0 (none across assistant history)"
+
+#: gepetto/ida/cli.py:778
+#, fuzzy, python-brace-format
+msgid "Failed to set idle status in status panel: {error}"
+msgstr "Failed to set idle status in status panel: {error}"
+
+#: gepetto/ida/comment_handler.py:37
+msgid ""
+"No focused view: returning BADADDR. Provide EA explicitly or call an "
+"operation that sets last_ea."
+msgstr ""
+"No focused view: returning BADADDR. Provide EA explicitly or call an "
+"operation that sets last_ea."
+
+#: gepetto/ida/comment_handler.py:54
+msgid "Hex-Rays not available: install/enable the Hex-Rays Decompiler."
+msgstr "Hex-Rays not available: install/enable the Hex-Rays Decompiler."
+
+#: gepetto/ida/comment_handler.py:83 gepetto/ida/handlers.py:112
+#: gepetto/ida/handlers.py:231 gepetto/ida/handlers.py:301
+#: gepetto/ida/handlers.py:354
 #, python-brace-format
 msgid "Request to {model} sent..."
 msgstr "{model} 请求发送中..."
 
-#: gepetto/ida/comment_handler.py:91
+#: gepetto/ida/comment_handler.py:111
+#, python-brace-format
+msgid "Response: {response}"
+msgstr "Response: {response}"
+
+#: gepetto/ida/comment_handler.py:117
 msgid "Model returned malformed JSON; comments not applied."
 msgstr "Model returned malformed JSON; comments not applied."
 
-#: gepetto/ida/comment_handler.py:95
+#: gepetto/ida/comment_handler.py:121
 #, python-brace-format
 msgid "Error: Malformed JSON from model: {error}"
 msgstr "Error: Malformed JSON from model: {error}"
 
-#: gepetto/ida/comment_handler.py:115 gepetto/ida/handlers.py:57
+#: gepetto/ida/comment_handler.py:150 gepetto/ida/handlers.py:57
 #, python-brace-format
 msgid "{model} query finished in {time:.2f} seconds!"
 msgstr "{model} 请求完毕，耗时 {time:.2f} 秒！"
 
-#: gepetto/ida/comment_handler.py:119
+#: gepetto/ida/comment_handler.py:154
 #, python-brace-format
 msgid "Error in comment callback: {error}"
 msgstr "Error in comment callback: {error}"
@@ -78,219 +188,318 @@ msgstr "Error in comment callback: {error}"
 msgid "Comment generated by Gepetto"
 msgstr "由 Gepetto 生成的注释"
 
+#: gepetto/ida/handlers.py:160
+#, fuzzy
+msgid "Select names to rename"
+msgstr "Select names to rename"
+
+#: gepetto/ida/handlers.py:161
+msgid "Old Name"
+msgstr "Old Name"
+
+#: gepetto/ida/handlers.py:161
+msgid "New Name"
+msgstr "New Name"
+
 #: gepetto/ida/handlers.py:178
 msgid "Rename cancelled by user."
 msgstr "Rename cancelled by user."
 
-#: gepetto/ida/handlers.py:208
+#: gepetto/ida/handlers.py:203 gepetto/ida/handlers.py:204
 #, python-brace-format
 msgid "Done! {count} name(s) renamed."
 msgstr "完成！已重命名 {count} 个名称。"
 
 #. Raised if an API key is missing. In which case, don't switch.
-#: gepetto/ida/handlers.py:259
+#: gepetto/ida/handlers.py:255
 #, python-brace-format
 msgid "Couldn't change model to {model}: {error}"
 msgstr "无法切换至 {model} 模型：{error}"
 
-#: gepetto/ida/handlers.py:269
+#: gepetto/ida/handlers.py:265
 #, fuzzy
 msgid "Switched model"
 msgstr "Switched model"
 
-#: gepetto/ida/handlers.py:302
-#, python-brace-format
-msgid ""
-"Please generate executable C code based on the following decompiled C code "
-"and ensure it includes all necessary header files and other information:\n"
-"{decompiler_output}"
-msgstr "请根据以下C反编译代码生成可执行的C代码，并确保包含所有必要的头文件和其他信息：\\n{decompiler_output}"
+#: gepetto/ida/handlers.py:266
+#, fuzzy, python-brace-format
+msgid "Model switched to: {model_name}."
+msgstr "Model switched to: {model_name}."
 
-#: gepetto/ida/handlers.py:328 gepetto/ida/handlers.py:381
+#: gepetto/ida/handlers.py:269
+#, fuzzy, python-brace-format
+msgid "Failed to update status panel: {error}"
+msgstr "Failed to update status panel: {error}"
+
+#: gepetto/ida/handlers.py:323 gepetto/ida/handlers.py:324
+#: gepetto/ida/handlers.py:376 gepetto/ida/handlers.py:377
 #, python-brace-format
 msgid "{model} generated code saved to {file_name}"
 msgstr "{model} 生成的代码保存到了 {file_name} "
 
-#: gepetto/ida/handlers.py:355
-#, python-brace-format
-msgid ""
-"Please generate equivalent Python code based on the following decompiled C "
-"code, and provide an example of the function call:\n"
-"{decompiler_output}"
-msgstr "请根据以下C反编译代码生成等价的python代码，并提供这个函数的调用示例：\\n{decompiler_output}"
-
-#: gepetto/ida/status_panel.py:50
+#: gepetto/ida/status_panel.py:55
 msgid "Show reasoning"
 msgstr "Show reasoning"
 
-#: gepetto/ida/status_panel.py:52
+#: gepetto/ida/status_panel.py:57
 msgid "Show tool calls"
 msgstr "Show tool calls"
 
-#: gepetto/ida/status_panel.py:54
+#: gepetto/ida/status_panel.py:59
 msgid "Clear"
 msgstr "Clear"
 
 #. Bottom row: Status + progress on left; Model on right
-#: gepetto/ida/status_panel.py:88
+#: gepetto/ida/status_panel.py:93
 #, fuzzy, python-brace-format
 msgid "Model: {model}"
 msgstr "Model: {model}"
 
-#: gepetto/ida/status_panel.py:89 gepetto/ida/status_panel.py:224
-#: gepetto/ida/status_panel.py:228
+#: gepetto/ida/status_panel.py:94 gepetto/ida/status_panel.py:237
+#: gepetto/ida/status_panel.py:241
 msgid "Status: Idle"
 msgstr "Status: Idle"
 
-#: gepetto/ida/status_panel.py:94
+#: gepetto/ida/status_panel.py:99
 msgid "Stop"
 msgstr "Stop"
 
-#: gepetto/ida/status_panel.py:200
+#: gepetto/ida/status_panel.py:213
 #, python-brace-format
 msgid "Model: {model_name}"
 msgstr "Model: {model_name}"
 
-#: gepetto/ida/status_panel.py:222
+#: gepetto/ida/status_panel.py:235
 msgid "Status: Done"
 msgstr "Status: Done"
-
-#: gepetto/ida/status_panel.py:262
-msgid "Reasoning"
-msgstr "Reasoning"
 
 #. Stream text into the log without creating new lines per chunk.
 #. Starts a new timestamped row with the given prefix on first call,
 #. then appends subsequent text to the same row.
-#: gepetto/ida/status_panel.py:298 gepetto/ida/status_panel.py:583
-#: gepetto/ida/status_panel.py:706
+#: gepetto/ida/status_panel.py:311 gepetto/ida/status_panel.py:604
+#: gepetto/ida/status_panel.py:727
 msgid "Gepetto: "
 msgstr "Gepetto: "
 
-#: gepetto/ida/status_panel.py:306
+#: gepetto/ida/status_panel.py:319
 msgid "Reasoning: "
 msgstr "Reasoning: "
 
-#: gepetto/ida/status_panel.py:620 gepetto/ida/status_panel.py:635
+#: gepetto/ida/status_panel.py:383
+msgid "User"
+msgstr "User"
+
+#: gepetto/ida/status_panel.py:392 gepetto/ida/status_panel.py:402
+#, fuzzy
+msgid "reasoning..."
+msgstr "reasoning..."
+
+#: gepetto/ida/status_panel.py:474
+#, python-brace-format
+msgid "{status} (trimmed)"
+msgstr "{status} (trimmed)"
+
+#: gepetto/ida/status_panel.py:641 gepetto/ida/status_panel.py:656
 msgid "Gepetto Status"
 msgstr "Gepetto Status"
 
-#: gepetto/ida/status_panel.py:648
+#: gepetto/ida/status_panel.py:669
 msgid "Could not show Gepetto Status panel."
 msgstr "Could not show Gepetto Status panel."
 
-#: gepetto/ida/status_panel.py:736
+#: gepetto/ida/status_panel.py:757
 #, python-brace-format
 msgid "User: {text}"
 msgstr "User: {text}"
 
-#: gepetto/ida/status_panel.py:753
+#: gepetto/ida/status_panel.py:774
 #, python-brace-format
 msgid "{model_name} reasoning..."
 msgstr "{model_name} reasoning..."
 
-#: gepetto/ida/status_panel.py:928
+#: gepetto/ida/status_panel.py:949 gepetto/ida/ui.py:298
 msgid "Idle"
 msgstr "Idle"
 
-#: gepetto/ida/status_panel.py:935
+#: gepetto/ida/status_panel.py:956
 msgid "Model"
 msgstr "Model"
 
-#: gepetto/ida/status_panel.py:938
+#: gepetto/ida/status_panel.py:959
 msgid ""
 "Requested stream close; server cancels promptly. Residual buffered tokens "
 "may appear; ignored."
-msgstr "Requested stream close; server cancels promptly. Residual buffered tokens may appear; ignored."
+msgstr ""
+"Requested stream close; server cancels promptly. Residual buffered tokens "
+"may appear; ignored."
 
-#: gepetto/ida/status_panel.py:940
+#: gepetto/ida/status_panel.py:961
 msgid ""
 "Best-effort stream close requested; upstream may compute briefly; further "
 "output is ignored."
-msgstr "Best-effort stream close requested; upstream may compute briefly; further output is ignored."
+msgstr ""
+"Best-effort stream close requested; upstream may compute briefly; further "
+"output is ignored."
 
-#: gepetto/ida/status_panel.py:942
+#: gepetto/ida/status_panel.py:963
 msgid "Cancellation requested upstream; further output (if any) is ignored."
 msgstr "Cancellation requested upstream; further output (if any) is ignored."
 
-#: gepetto/ida/status_panel.py:943 gepetto/ida/status_panel.py:947
+#: gepetto/ida/status_panel.py:964 gepetto/ida/status_panel.py:968
 msgid "Canceled."
 msgstr "Canceled."
 
-#: gepetto/ida/tools/function_utils.py:14
-msgid "No EA provided"
-msgstr "No EA provided"
+#: gepetto/ida/tools/decompile_function.py:34 gepetto/ida/tools/patching.py:85
+#, fuzzy
+msgid "address is required"
+msgstr "address is required"
 
-#: gepetto/ida/tools/function_utils.py:22
-#, python-brace-format
-msgid "Unsupported EA type: {type_name}"
-msgstr "Unsupported EA type: {type_name}"
-
-#: gepetto/ida/tools/function_utils.py:33
-#: gepetto/ida/tools/function_utils.py:57
+#: gepetto/ida/tools/function_utils.py:23
+#: gepetto/ida/tools/function_utils.py:47
 msgid "Name not found: {name!r}"
 msgstr "Name not found: {name!r}"
 
-#: gepetto/ida/tools/function_utils.py:43
+#: gepetto/ida/tools/function_utils.py:34
 msgid "Failed to resolve EA"
 msgstr "Failed to resolve EA"
 
-#: gepetto/ida/tools/function_utils.py:61
+#: gepetto/ida/tools/function_utils.py:51
 msgid "Symbol {name!r} not inside a function."
 msgstr "Symbol {name!r} not inside a function."
 
-#: gepetto/ida/tools/function_utils.py:67
+#: gepetto/ida/tools/function_utils.py:58
 #, python-brace-format
 msgid "EA 0x{ea:X} is not inside a function."
 msgstr "EA 0x{ea:X} is not inside a function."
 
-#: gepetto/ida/tools/function_utils.py:76
+#: gepetto/ida/tools/function_utils.py:68
 msgid "Failed to resolve function"
 msgstr "Failed to resolve function"
 
-#: gepetto/ida/tools/get_function_code.py:57
-msgid "Decompilation failed."
-msgstr "Decompilation failed."
-
-#: gepetto/ida/tools/get_function_code.py:69
+#: gepetto/ida/tools/get_function_code.py:67
 msgid "Unknown decompilation error."
 msgstr "Unknown decompilation error."
 
-#: gepetto/ida/tools/get_xrefs.py:132
+#: gepetto/ida/tools/get_xrefs.py:134
 msgid "direction must be 'to'|'from'|'both'"
 msgstr "direction must be 'to'|'from'|'both'"
 
-#: gepetto/ida/tools/get_xrefs.py:134
+#: gepetto/ida/tools/get_xrefs.py:136
 msgid "scope must be 'ea'|'function'|'name'"
 msgstr "scope must be 'ea'|'function'|'name'"
+
+#: gepetto/ida/tools/globals_and_imports.py:310
+#: gepetto/ida/tools/globals_and_imports.py:396
+msgid "Failed to execute on main thread"
+msgstr "Failed to execute on main thread"
+
+#: gepetto/ida/tools/globals_and_imports.py:316
+#, python-brace-format
+msgid "Global variable value retrieval failed: {error}"
+msgstr "Global variable value retrieval failed: {error}"
+
+#: gepetto/ida/tools/memory.py:22
+msgid "size must be > 0"
+msgstr "size must be > 0"
+
+#: gepetto/ida/tools/numbers.py:22
+#, fuzzy
+msgid "text is required"
+msgstr "text is required"
+
+#: gepetto/ida/tools/numbers.py:26
+#, python-brace-format
+msgid "Invalid number: {text}"
+msgstr "Invalid number: {text}"
+
+#: gepetto/ida/tools/numbers.py:40
+#, python-brace-format
+msgid "Number {text} is too big for {size} bytes"
+msgstr "Number {text} is too big for {size} bytes"
+
+#: gepetto/ida/tools/patching.py:26
+#, fuzzy, python-brace-format
+msgid "Failed to assemble instruction: {assemble}"
+msgstr "Failed to assemble instruction: {assemble}"
+
+#: gepetto/ida/tools/patching.py:33
+msgid "assembles is required (semicolon separated)"
+msgstr "assembles is required (semicolon separated)"
+
+#: gepetto/ida/tools/patching.py:87
+msgid "count must be >= 1"
+msgstr "count must be >= 1"
+
+#: gepetto/ida/tools/prototypes.py:25
+msgid "function_address and prototype are required"
+msgstr "function_address and prototype are required"
 
 #: gepetto/ida/tools/refresh_view.py:42
 msgid "Failed to refresh view"
 msgstr "Failed to refresh view"
 
-#: gepetto/ida/tools/rename_function.py:47
+#: gepetto/ida/tools/rename_function.py:48
 msgid "new_name is required"
 msgstr "new_name is required"
 
-#: gepetto/ida/tools/rename_function.py:58
+#: gepetto/ida/tools/rename_function.py:60
 msgid "Failed to rename function {old_name!r}"
 msgstr "Failed to rename function {old_name!r}"
 
-#: gepetto/ida/tools/rename_function.py:69
+#: gepetto/ida/tools/rename_function.py:73
 msgid "Failed to rename function"
 msgstr "Failed to rename function"
 
-#: gepetto/ida/tools/rename_lvar.py:47
+#: gepetto/ida/tools/rename_lvar.py:53
 msgid "old_name and new_name are required"
 msgstr "old_name and new_name are required"
 
-#: gepetto/ida/tools/rename_lvar.py:59
+#: gepetto/ida/tools/rename_lvar.py:70
+#, fuzzy, python-brace-format
+msgid "Function frame not found for {func_name}"
+msgstr "Function frame not found for {func_name}"
+
+#: gepetto/ida/tools/rename_lvar.py:74
+msgid "Local variable {old_name!r} not found in frame"
+msgstr "Local variable {old_name!r} not found in frame"
+
+#: gepetto/ida/tools/rename_lvar.py:78
+#, python-brace-format
+msgid "'{old_name}' is a special frame member and cannot be renamed."
+msgstr "'{old_name}' is a special frame member and cannot be renamed."
+
+#: gepetto/ida/tools/rename_lvar.py:84
+#, python-brace-format
+msgid "'{old_name}' is an argument member and cannot be renamed."
+msgstr "'{old_name}' is an argument member and cannot be renamed."
+
+#: gepetto/ida/tools/rename_lvar.py:92
 msgid "Failed to rename lvar {old_name!r}"
 msgstr "Failed to rename lvar {old_name!r}"
 
-#: gepetto/ida/tools/rename_lvar.py:70
+#: gepetto/ida/tools/rename_lvar.py:105
 msgid "Failed to rename lvar"
 msgstr "Failed to rename lvar"
+
+#: gepetto/ida/tools/stack_frame.py:81
+msgid "No frame returned."
+msgstr "No frame returned."
+
+#: gepetto/ida/tools/stack_frame.py:148
+#, fuzzy, python-brace-format
+msgid "Failed to get stack frame variables: {error}"
+msgstr "Failed to get stack frame variables: {error}"
+
+#. Return empty list instead of raising exception for better tool compatibility
+#: gepetto/ida/tools/stack_frame.py:153
+#, python-brace-format
+msgid "Warning: get_stack_frame_variables failed: {error}"
+msgstr "Warning: get_stack_frame_variables failed: {error}"
+
+#: gepetto/ida/tools/xrefs2.py:74
+#, fuzzy
+msgid "struct_name and field_name are required"
+msgstr "struct_name and field_name are required"
 
 #: gepetto/ida/ui.py:40 gepetto/ida/ui.py:75
 msgid "Explain function"
@@ -404,10 +613,42 @@ msgstr "OFF"
 msgid "Failed to toggle parallel tool calls: {error}"
 msgstr "Failed to toggle parallel tool calls: {error}"
 
+#: gepetto/ida/utils/ida9_utils.py:97
+msgid "No EA provided"
+msgstr "No EA provided"
+
+#: gepetto/ida/utils/ida9_utils.py:103
+msgid "Empty EA string"
+msgstr "Empty EA string"
+
+#: gepetto/ida/utils/ida9_utils.py:110
+#, python-brace-format
+msgid "Invalid EA format: {value}"
+msgstr "Invalid EA format: {value}"
+
+#: gepetto/ida/utils/ida9_utils.py:111
+#, python-brace-format
+msgid "Unsupported EA type: {type_name}"
+msgstr "Unsupported EA type: {type_name}"
+
+#: gepetto/ida/utils/ida9_utils.py:293
+msgid "Empty type declaration"
+msgstr "Empty type declaration"
+
+#: gepetto/ida/utils/ida9_utils.py:313
+#, python-brace-format
+msgid "Failed to parse type declaration: {type_decl}"
+msgstr "Failed to parse type declaration: {type_decl}"
+
+#: gepetto/ida/utils/ida9_utils.py:331
+#, fuzzy, python-brace-format
+msgid "EA {ea} is not inside a function."
+msgstr "EA {ea} is not inside a function."
+
 #: gepetto/models/aliyun.py:62 gepetto/models/deepseek.py:36
 #: gepetto/models/gemini.py:239 gepetto/models/groq.py:37
 #: gepetto/models/kluster.py:58 gepetto/models/novita_ai.py:41
-#: gepetto/models/openai.py:67 gepetto/models/openai_compatible.py:63
+#: gepetto/models/openai.py:70 gepetto/models/openai_compatible.py:63
 #: gepetto/models/openrouter.py:52 gepetto/models/siliconflow.py:60
 #: gepetto/models/together.py:34
 #, python-brace-format
@@ -415,19 +656,19 @@ msgid ""
 "Please edit the configuration file to insert your {api_provider} API key!"
 msgstr "请编辑配置文件并插入您的 {api_provider} API 密钥！"
 
-#: gepetto/models/gemini.py:219
-msgid "Google Gemini"
-msgstr "Google Gemini"
-
 #: gepetto/models/gemini.py:254
 #, fuzzy
 msgid ""
 "Proxy configuration for Gemini via google-genai library might require manual "
 "setup of HTTPS_PROXY environment variable."
-msgstr "Proxy configuration for Gemini via google-genai library might require manual setup of HTTPS_PROXY environment variable."
+msgstr ""
+"Proxy configuration for Gemini via google-genai library might require manual "
+"setup of HTTPS_PROXY environment variable."
 
-#: gepetto/models/gemini.py:621 gepetto/models/openai.py:367
-#: gepetto/models/openai.py:594 gepetto/models/openai.py:616
+#. Otherwise, propagate as a general exception path below
+#: gepetto/models/gemini.py:621 gepetto/models/openai.py:430
+#: gepetto/models/openai.py:439 gepetto/models/openai.py:787
+#: gepetto/models/openai.py:809
 #, python-brace-format
 msgid "General exception encountered while running the query: {error}"
 msgstr "运行查询时遇到常规异常：{error}"
@@ -456,52 +697,61 @@ msgstr "Module {module} loading failed: {error}. Skipping.."
 msgid "No valid Novita AI API key found"
 msgstr "No valid Novita AI API key found"
 
-#: gepetto/models/openai.py:594
+#: gepetto/models/openai.py:274 gepetto/models/openai.py:561
+#, python-brace-format
+msgid ""
+"Streaming fallback: {why}. Switching to non‑streaming mode. Latency may be "
+"higher; reasoning summaries will be disabled."
+msgstr ""
+"Streaming fallback: {why}. Switching to non‑streaming mode. Latency may be "
+"higher; reasoning summaries will be disabled."
+
+#: gepetto/models/openai.py:276 gepetto/models/openai.py:563
+#, python-brace-format
+msgid ""
+"Streaming fallback: {why}. Switching to non‑streaming mode. Latency may be "
+"higher."
+msgstr ""
+"Streaming fallback: {why}. Switching to non‑streaming mode. Latency may be "
+"higher."
+
+#: gepetto/models/openai.py:297 gepetto/models/openai.py:582
+#, fuzzy, python-brace-format
+msgid "Exception encountered while retrying without streaming: {error}"
+msgstr "Exception encountered while retrying without streaming: {error}"
+
+#: gepetto/models/openai.py:320 gepetto/models/openai.py:621
+msgid "Previously detected org/model streaming restriction"
+msgstr "Previously detected org/model streaming restriction"
+
+#: gepetto/models/openai.py:424 gepetto/models/openai.py:763
+#, python-brace-format
+msgid ""
+"Unable to query in streaming mode: {error}\n"
+"Falling back and retrying!"
+msgstr ""
+"Unable to query in streaming mode: {error}\\nFalling back and retrying!"
+
+#: gepetto/models/openai.py:773
+msgid "Reasoning not permitted for this org/model; retrying without reasoning."
+msgstr ""
+"Reasoning not permitted for this org/model; retrying without reasoning."
+
+#: gepetto/models/openai.py:778
+msgid ""
+"Reasoning summaries are disabled for this org/model; continuing without "
+"reasoning."
+msgstr ""
+"Reasoning summaries are disabled for this org/model; continuing without "
+"reasoning."
+
+#: gepetto/models/openai.py:785
 msgid ""
 "Unfortunately, this function is too big to be analyzed with the model's "
 "current API limits."
 msgstr "很遗憾，此函数规模过大，已超出模型当前 API 的限制范围。"
 
-#: gepetto/models/openai.py:605
+#: gepetto/models/openai.py:798
 #, python-brace-format
 msgid "{model} could not complete the request: {error}"
 msgstr "{model} 无法完成请求：{error}"
-
-#~ msgid ""
-#~ "You are a helpful assistant embedded in IDA Pro. Your role is to "
-#~ "facilitate reverse-engineering and answer programming questions."
-#~ msgstr ""
-#~ "您是内置于 IDA Pro 的智能助手，主要职责是协助逆向工程分析和解答编程相关问"
-#~ "题。"
-
-#~ msgid ""
-#~ "Could not obtain valid data from the model, giving up. Dumping the "
-#~ "response for manual import:"
-#~ msgstr "无法从模型获取有效数据，放弃操作。正在转储响应以供手动导入："
-
-#~ msgid ""
-#~ "Cannot extract valid JSON from the response. Asking the model to fix it..."
-#~ msgstr "无法从响应中提取有效 JSON，正在请求模型修复..."
-
-#~ msgid "The JSON document returned is invalid. Asking the model to fix it..."
-#~ msgstr "返回的 JSON 文档无效，正在请求模型修复..."
-
-#~ msgid "Please fix the following JSON document:\n"
-#~ msgstr "请修复以下 JSON 文档：\n"
-
-#~ msgid ""
-#~ "The JSON document provided in this response is invalid. Can you fix it?\n"
-#~ "{response}"
-#~ msgstr ""
-#~ "此响应提供的 JSON 文档无效，请修复：\n"
-#~ "{response}"
-
-#~ msgid "{model} query finished! {replaced} variable(s) renamed."
-#~ msgstr "{model} 请求完成！已重命名 {replaced} 个变量。"
-
-#~ msgid ""
-#~ "Context length exceeded! Reducing the completion tokens to {max_tokens}..."
-#~ msgstr "上下文长度超出限制！正在将完成令牌数缩减至 {max_tokens}..."
-
-#~ msgid "Auto Analyze"
-#~ msgstr "自动分析"

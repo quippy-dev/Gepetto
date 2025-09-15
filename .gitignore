@@ -2,3 +2,10 @@
 .?venv
 __pycache__/
 *.py[cod]
+.vscode/
+.vs/
+.DS_Store
+
+# Gettext backup artifacts
+**/*.po~
+**/*.pot~

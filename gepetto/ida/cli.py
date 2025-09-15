@@ -99,6 +99,7 @@ class GepettoCLI(ida_kernwin.cli_t):
         MESSAGES.append({"role": "user", "content": line})
 
         streamed_summary_seen = False
+        printed_any_text = False
 
         def handle_response(response):
             # Parse a Responses API Response into text and tool calls
@@ -435,6 +436,19 @@ class GepettoCLI(ida_kernwin.cli_t):
                     STATUS.summary_stream_end()
                 except Exception:
                     pass
+                # If we haven't streamed any assistant text yet but we have text
+                # in the final response (common when streaming is disabled), print it now.
+                if isinstance(text, str) and text.strip() and not printed_any_text:
+                    try:
+                        STATUS.answer_stream(text, str(gepetto.config.model))
+                        print("\n")
+                        STATUS.end_stream()
+                    except Exception:
+                        # Fall back to a simple log if styled stream fails
+                        try:
+                            STATUS.log(text)
+                        except Exception:
+                            pass
                 final_msg = {"role": "assistant", "content": text or ""}
                 if gemini_parts:
                     final_msg["parts"] = gemini_parts
@@ -557,11 +571,20 @@ class GepettoCLI(ida_kernwin.cli_t):
                 return s
 
             def on_chunk(delta=None, finish_reason=None, response=None):
-                nonlocal summary_text_started, summary_buffer
+                nonlocal summary_text_started, summary_buffer, printed_any_text
                 # Final Responses API object
                 if response is not None:
                     try:
                         handle_response(response)
+                    except Exception:
+                        pass
+                    return
+                # Status/notice events from backends
+                if isinstance(delta, dict) and delta.get("status") == "fallback":
+                    try:
+                        text = delta.get("text") or _("Streaming fallback activated: switching to non‑streaming mode. Latency may be higher and reasoning summaries will be disabled.")
+                        STATUS.set_status(_("Fallback (no streaming)"), busy=True)
+                        STATUS.log(text)
                     except Exception:
                         pass
                     return
@@ -573,6 +596,14 @@ class GepettoCLI(ida_kernwin.cli_t):
                     STATUS.set_status(_("Reasoning..."), busy=True)
                     STATUS.set_reasoning(_("Reasoning"))
                     return
+                if isinstance(delta, dict) and delta.get("status") == "notice":
+                    try:
+                        text = delta.get("text")
+                        if isinstance(text, str) and text:
+                            STATUS.log(text)
+                    except Exception:
+                        pass
+                    # do not return; allow other handlers below to run if needed
                 # OpenAI Responses: live reasoning UI updates
                 if isinstance(delta, dict):
                     rt = delta.get("reasoning_text_delta")
@@ -647,6 +678,7 @@ class GepettoCLI(ida_kernwin.cli_t):
                     # Respect Stop: suppress console output and UI streaming when stopped
                     if getattr(STATUS, "_stopped", False):
                         return
+                    printed_any_text = True
                     STATUS.answer_stream(delta, model_name)
                     print(delta, end="", flush=True)
                     message.content += delta
