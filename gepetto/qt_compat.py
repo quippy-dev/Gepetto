@@ -94,8 +94,10 @@ def install() -> None:
     if sh2 is not None and "shiboken6" not in sys.modules:
         _alias_module("shiboken6", sh2)
 
-    # Minimal enum backfills for Qt5 environments, only if missing in Qt5
-    # (Most usages in this plugin are already compatible.)
+    # Minimal enum backfills for Qt5 environments, only if missing in Qt5.
+    # Most usages in this plugin are already compatible.
+    # Note: status_panel.py uses QPalette roles, but they are guarded by
+    # try/except blocks, so no backfill is needed here for now.
     try:
         # Ensure QTextCursor.MoveOperation exists (PyQt5 already provides it).
         # Keep this block small and defensive to avoid changing behavior on Qt6.

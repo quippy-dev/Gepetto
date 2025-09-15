@@ -8,7 +8,7 @@ rename its variables. Here is a simple example of what results it can provide in
 
 ## Setup
 
-Requirements: IDA Pro 9.x (earlier versions are not supported) and the Hex-Rays Decompiler.
+Requirements: IDA Pro 7.x/8.x/9.x and the Hex-Rays Decompiler.
 
 Simply drop this script (`gepetto.py`, as well as the `gepetto/` folder) into your IDA plugins folder (`$IDAUSR/plugins`). 
 By default, on Windows, this should be `%AppData%\Hex-Rays\IDA Pro\plugins` (you may need to create it).
@@ -29,7 +29,7 @@ method with the corresponding provider.
 
 ## Supported models
 
-- [OpenAI](https://playground.openai.com/)
+- [OpenAI (Responses)](https://playground.openai.com/)
   - "gpt-5"
   - "gpt-5-mini"
   - "gpt-5-nano"
@@ -77,9 +77,11 @@ method with the corresponding provider.
 - [LM Studio](https://lmstudio.ai/)
   - Any local model exposed through LM Studio (will not appear if LM Studio Developer server is not running)
 
-Adding support for additional models shouldn't be too difficult, provided whatever provider you're considering exposes
-an API similar to OpenAI's. Look into the `gepetto/models` folder for inspiration, or open an issue if you can't figure
-it out.
+Adding support for additional models shouldn't be too difficult. Look into the `gepetto/models` folder for inspiration.
+Most new providers can inherit from the `OAIChatAPI` base class. If the provider supports OpenAI's "Responses" API, you
+can use the `OAIResponsesAPI` base class instead. You will need to implement a `_make_client` method that returns a
+configured client for the provider. If the provider uses a different tool schema, you will need to add a new tool schema
+and bridge in `gepetto/ida/tools/schemas`.
 
 ## Usage
 

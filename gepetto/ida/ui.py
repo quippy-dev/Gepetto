@@ -17,7 +17,7 @@ import gepetto.models.model_manager
 
 _ = gepetto.config._
 
-# Use PySide6 exclusively (IDA 9.x). Do not mix bindings.
+# Qt bindings; compatible with PySide6/PyQt5 via qt_compat shim.
 try:
     from PySide6 import QtWidgets, QtCore, QtGui  # type: ignore
 except Exception:

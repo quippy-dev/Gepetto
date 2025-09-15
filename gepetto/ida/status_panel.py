@@ -6,7 +6,7 @@ import gepetto.config
 
 _ = gepetto.config._
 
-# Use PySide6 exclusively (IDA 9.x). Do not mix bindings.
+# Qt bindings; compatible with PySide6/PyQt5 via qt_compat shim.
 try:
     from PySide6 import QtWidgets, QtCore, QtGui  # type: ignore
 except Exception:
@@ -20,6 +20,12 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
         if QtWidgets is not None:
             try:
                 self.parent = self.FormToPyQtWidget(form)
+            except AttributeError:
+                try:
+                    # Fallback for older IDA versions
+                    self.parent = self.FormToPySideWidget(form)
+                except Exception:
+                    self.parent = None
             except Exception:
                 self.parent = None
         self._build_ui()
