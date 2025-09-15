@@ -611,7 +611,10 @@ class GPT(LanguageModel):
                     return
         except openai.BadRequestError as e:
             m = re.search(r'maximum context length is \d+ tokens, however you requested \d+ tokens', str(e))
-            msg = _("Unfortunately, this function is too big to be analyzed with the model's current API limits.") if m else _("General exception encountered while running the query: {error}").format(error=str(e))
+            if m:
+                msg = _("Unfortunately, this function is too big to be analyzed with the model's current API limits.")
+            else:
+                msg = _("General exception encountered while running the query: {error}").format(error=e)
             try:
                 if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
                     with self._cancel_lock:

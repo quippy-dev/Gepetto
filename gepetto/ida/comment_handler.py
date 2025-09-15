@@ -108,7 +108,7 @@ def comment_callback(decompiler_output, pseudocode_lines, view, response, start_
             return getattr(resp, "content", "") or ""
         response_text = _to_text(response)
 
-        print(f"Response: {response_text}")
+        print(_("Response: {response}").format(response=response_text))
 
         try:
             items = json.loads(response_text)

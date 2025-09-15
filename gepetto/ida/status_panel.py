@@ -380,7 +380,8 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
         ts = datetime.datetime.now().strftime("%H:%M:%S")
         import html as _html
         safe = _html.escape(text).replace("\n", "<br/>")
-        html = f"{ts} | <b>User</b>: {safe}"
+        user_name = _html.escape(_("User"))
+        html = f"{ts} | <b>{user_name}</b>: {safe}"
         self.append_line_html(html)
 
     # Styled summary streaming (bold header + italic body)
@@ -388,7 +389,7 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
         ts = datetime.datetime.now().strftime("%H:%M:%S")
         import html as _html
         safe_model = _html.escape(model_name)
-        header_html = f"{ts} | <b>{safe_model} reasoning...</b>"  # newline added below
+        header_html = f"{ts} | <b>{safe_model} {_html.escape(_('reasoning...'))}</b>"  # newline added below
         # Force cursor to end to prevent user interference
         self._force_cursor_to_end()
         try:
@@ -398,7 +399,7 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
         except Exception:
             # Plain-text fallback, still respecting line boundaries
             self._ensure_line_start()
-            self._log.insertPlainText(f"{ts} | {model_name} reasoning...\n")
+            self._log.insertPlainText("{ts} | {model_name} {reason}\n".format(ts=ts, model_name=model_name, reason=_("reasoning...")))
         # Always autoscroll
         self._log.verticalScrollBar().setValue(self._log.verticalScrollBar().maximum())
         # Start reasoning label animation and show the container
@@ -470,7 +471,7 @@ class GepettoStatusForm(ida_kernwin.PluginForm):
             s = ""
         if len(s) <= limit:
             return s
-        return s[:limit] + " (trimmed)"
+        return _("{status} (trimmed)").format(status=s[:limit])
 
     def _render_status(self):
         try:

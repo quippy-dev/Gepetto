@@ -295,7 +295,7 @@ class _ShowStatusPanelHandler(idaapi.action_handler_t):
         try:
             STATUS.ensure_shown()
             STATUS.set_model(str(gepetto.config.model))
-            STATUS.set_status("Idle", busy=False)
+            STATUS.set_status(_("Idle"), busy=False)
             STATUS.log(_("Status panel opened"))
         except Exception as e:
             try:

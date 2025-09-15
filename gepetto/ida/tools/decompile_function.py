@@ -31,7 +31,7 @@ def _decompile_checked(func_ea: int):
 
 def decompile_function(address: str) -> dict:
     if not address:
-        raise ValueError("address is required")
+        raise ValueError(_("address is required"))
 
     out = {"ok": False}
 

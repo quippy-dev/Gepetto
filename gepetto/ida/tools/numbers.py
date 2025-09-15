@@ -19,11 +19,11 @@ def handle_convert_number_tc(tc, messages):
 
 def convert_number(text: str, size: int | None) -> dict:
     if not text:
-        raise ValueError("text is required")
+        raise ValueError(_("text is required"))
     try:
         value = int(text, 0)
     except ValueError:
-        raise ValueError(f"Invalid number: {text}")
+        raise ValueError(_("Invalid number: {text}").format(text=text))
 
     if not size:
         n = abs(value)
@@ -37,7 +37,7 @@ def convert_number(text: str, size: int | None) -> dict:
     try:
         b = value.to_bytes(size, "little", signed=True)
     except OverflowError:
-        raise ValueError(f"Number {text} is too big for {size} bytes")
+        raise ValueError(_("Number {text} is too big for {size} bytes").format(text=text, size=size))
 
     ascii_s = ""
     for byte in b.rstrip(b"\x00"):

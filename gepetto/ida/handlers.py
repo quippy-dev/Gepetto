@@ -76,7 +76,7 @@ def conversation_callback(response, memory):
     memory.append({"role": "assistant", "content": text})
 
     print()
-    STATUS.log(_(f"{str(gepetto.config.model)}: {text}"))
+    STATUS.log(f"{str(gepetto.config.model)}: {text}")
     for line in text.split("\n"):
         if not line.strip():
             continue
@@ -157,8 +157,8 @@ def rename_callback(address, view, response):
     class RenameChoose(ida_kernwin.Choose):
         def __init__(self, rename_pairs):
             super().__init__(
-                "Select names to rename",
-                [["Old Name", 20], ["New Name", 20]],
+                _("Select names to rename"),
+                [[_("Old Name"), 20], [_("New Name"), 20]],
                 flags=ida_kernwin.Choose.CH_MULTI,
             )
             self.items = [[old, new] for old, new in rename_pairs]
@@ -200,7 +200,7 @@ def rename_callback(address, view, response):
 
     if view:
         view.refresh_view(True)
-    STATUS.log(_(f"Done! {len(replaced)} name(s) renamed."))
+    STATUS.log(_("Done! {count} name(s) renamed.").format(count=len(replaced)))
     print(_("Done! {count} name(s) renamed.").format(count=len(replaced)))
 
 
@@ -263,10 +263,10 @@ class SwapModelHandler(idaapi.action_handler_t):
             STATUS.ensure_shown()
             STATUS.set_model(str(gepetto.config.model))
             STATUS.set_status(_("Switched model"), busy=False)
-            STATUS.log(_(f"Model switched to: {self.new_model}."))
+            STATUS.log(_("Model switched to: {model_name}.").format(model_name=self.new_model))
         except Exception as e:
             try:
-                print(f"Failed to update status panel: {e}")
+                print(_("Failed to update status panel: {error}").format(error=e))
             except Exception:
                 pass
 
@@ -295,7 +295,7 @@ class GenerateCCodeHandler(idaapi.action_handler_t):
             pass
 
         gepetto.config.model.query_model_async(
-            _("Please generate executable C code based on the following decompiled C code and ensure it includes all necessary header files and other information:\n{decompiler_output}").format(decompiler_output=str(decompiler_output)),
+            "Please generate executable C code based on the following decompiled C code and ensure it includes all necessary header files and other information:\n{decompiler_output}".format(decompiler_output=str(decompiler_output)),
             functools.partial(self._save_c_code, view=v)
         )
         print(_("Request to {model} sent...").format(model=str(gepetto.config.model)))
@@ -320,7 +320,7 @@ class GenerateCCodeHandler(idaapi.action_handler_t):
 
         if view:
             view.refresh_view(False)
-        STATUS.log(_(f"{str(gepetto.config.model)} generated code saved to {file_name}"))
+        STATUS.log(_("{model} generated code saved to {file_name}").format(model=str(gepetto.config.model), file_name=file_name))
         print(_("{model} generated code saved to {file_name}").format(model=str(gepetto.config.model), file_name=file_name))
 
     def update(self, ctx):
@@ -348,7 +348,7 @@ class GeneratePythonCodeHandler(idaapi.action_handler_t):
             pass
 
         gepetto.config.model.query_model_async(
-            _("Please generate equivalent Python code based on the following decompiled C code, and provide an example of the function call:\n{decompiler_output}").format(decompiler_output=str(decompiler_output)),
+            "Please generate equivalent Python code based on the following decompiled C code, and provide an example of the function call:\n{decompiler_output}".format(decompiler_output=str(decompiler_output)),
             functools.partial(self._save_python_code, view=v)
         )
         print(_("Request to {model} sent...").format(model=str(gepetto.config.model)))
@@ -373,7 +373,7 @@ class GeneratePythonCodeHandler(idaapi.action_handler_t):
 
         if view:
             view.refresh_view(False)
-        STATUS.log(_(f"{str(gepetto.config.model)} generated code saved to {file_name}"))
+        STATUS.log(_("{model} generated code saved to {file_name}").format(model=str(gepetto.config.model), file_name=file_name))
         print(_("{model} generated code saved to {file_name}").format(model=str(gepetto.config.model), file_name=file_name))
 
     def update(self, ctx):

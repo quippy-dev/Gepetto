@@ -22,7 +22,7 @@ def handle_set_function_prototype_tc(tc, messages):
 
 def set_function_prototype(function_address: str, prototype: str) -> dict:
     if not function_address or prototype is None:
-        raise ValueError("function_address and prototype are required")
+        raise ValueError(_("function_address and prototype are required"))
     ea = parse_ea(function_address)
     touch_last_ea(ea)
     out = {"ok": False}

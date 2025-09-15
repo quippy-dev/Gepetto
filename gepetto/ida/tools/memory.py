@@ -19,7 +19,7 @@ def handle_read_memory_bytes_tc(tc, messages):
         touch_last_ea(addr)
         size = int(args.get("size", 0) or 0)
         if size <= 0:
-            raise ValueError("size must be > 0")
+            raise ValueError(_("size must be > 0"))
         
         # Run on UI thread (IDA 9.x): many IDA APIs are main-thread-only
         out = {"data": None}

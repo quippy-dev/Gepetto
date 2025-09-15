@@ -4,6 +4,8 @@ IDA 9.x utility functions for robust plugin operation.
 This module provides thread-safe, headless-tolerant utilities for common
 IDA operations with proper error handling and fallback mechanisms.
 """
+import gepetto.config
+_ = gepetto.config._
 
 # Be import-safe outside IDA: guard imports
 try:
@@ -92,21 +94,21 @@ def parse_ea(ea_input):
         ValueError: If input cannot be parsed as valid EA
     """
     if ea_input is None:
-        raise ValueError("No EA provided")
+        raise ValueError(_("No EA provided"))
     if isinstance(ea_input, int):
         return ea_input
     if isinstance(ea_input, str):
         s = ea_input.strip()
         if not s:
-            raise ValueError("Empty EA string")
+            raise ValueError(_("Empty EA string"))
         # Handle 'h' suffix (hex)
         if s.lower().endswith('h'):
             s = "0x" + s[:-1]
         try:
             return int(s, 0)  # Auto-detect base (0x for hex, else decimal)
         except ValueError:
-            raise ValueError(f"Invalid EA format: {ea_input!r}")
-    raise ValueError(f"Unsupported EA type: {type(ea_input).__name__}")
+            raise ValueError(_("Invalid EA format: {value}").format(value=repr(ea_input)))
+    raise ValueError(_("Unsupported EA type: {type_name}").format(type_name=type(ea_input).__name__))
 
 
 def ea_to_hex(ea):
@@ -288,7 +290,7 @@ def parse_type_declaration(type_decl: str):
         ValueError: If type cannot be parsed
     """
     if not type_decl or not type_decl.strip():
-        raise ValueError("Empty type declaration")
+        raise ValueError(_("Empty type declaration"))
     
     type_decl = type_decl.strip()
     tif = ida_typeinf.tinfo_t()
@@ -308,7 +310,7 @@ def parse_type_declaration(type_decl: str):
         if tif.is_correct():
             return tif
     
-    raise ValueError(f"Failed to parse type declaration: {type_decl}")
+    raise ValueError(_("Failed to parse type declaration: {type_decl}").format(type_decl=type_decl))
 
 
 def validate_function_ea(ea: int):
@@ -326,7 +328,7 @@ def validate_function_ea(ea: int):
     """
     func = ida_funcs.get_func(ea)
     if not func:
-        raise ValueError(f"EA {ea_to_hex(ea)} is not inside a function.")
+        raise ValueError(_("EA {ea} is not inside a function.").format(ea=ea_to_hex(ea)))
     return func
 
 def enumerate_symbols():

@@ -78,7 +78,7 @@ def handle_delete_stack_frame_variable_tc(tc, messages):
 def _frame_tinfo(func) -> ida_typeinf.tinfo_t:
     frame_tif = ida_typeinf.tinfo_t()
     if not ida_frame.get_func_frame(frame_tif, func):
-        raise ValueError("No frame returned.")
+        raise ValueError(_("No frame returned."))
     return frame_tif
 
 
@@ -145,12 +145,12 @@ def get_stack_frame_variables(function_address: str) -> list[dict]:
         # Execute on main thread with write access for stability on IDA 9.x
         if not run_on_main_thread(_do, write=True):
             if result["error"]:
-                raise ValueError(f"Failed to get stack frame variables: {result['error']}")
+                raise ValueError(_("Failed to get stack frame variables: {error}").format(error=result['error']))
         return result["members"]
         
     except Exception as e:
         # Return empty list instead of raising exception for better tool compatibility
-        print(f"Warning: get_stack_frame_variables failed: {e}")
+        print(_("Warning: get_stack_frame_variables failed: {error}").format(error=e))
         return []
 
 

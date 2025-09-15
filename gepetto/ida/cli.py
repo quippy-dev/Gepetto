@@ -77,7 +77,7 @@ class GepettoCLI(ida_kernwin.cli_t):
         try:
             STATUS.ensure_shown()
             STATUS.set_model(str(gepetto.config.model))
-            STATUS.set_status("Waiting for model...", busy=True)
+            STATUS.set_status(_("Waiting for model..."), busy=True)
             # Reset stop state and bind backend cancellation to Stop button
             try:
                 STATUS.reset_stop()
@@ -92,7 +92,7 @@ class GepettoCLI(ida_kernwin.cli_t):
             STATUS.log_user(line)
         except Exception as e:
             try:
-                print(f"Failed to make status panel visible: {e}")
+                print(_("Failed to make status panel visible: {error}").format(error=e))
             except Exception:
                 pass
 
@@ -225,9 +225,9 @@ class GepettoCLI(ida_kernwin.cli_t):
                             # assume already base64
                             sigs.append(sig)
                     if sigs:
-                        STATUS.log(f"Thought signatures: {len(sigs)} present; first={sigs[0][:16]}…")
+                        STATUS.log(_("Thought signatures: {count} present; first={first}…").format(count=len(sigs), first=sigs[0][:16]))
                     else:
-                        STATUS.log("Thought signatures: none present in this turn")
+                        STATUS.log(_("Thought signatures: none present in this turn"))
             except Exception:
                 pass
             reasoning_summary = _response_reasoning_summary(response)
@@ -237,7 +237,7 @@ class GepettoCLI(ida_kernwin.cli_t):
                     STATUS.summary_stream_end()
                 except Exception:
                     pass
-                STATUS.set_status(f"Tool calls requested: {len(tool_calls_ns)}", busy=False)
+                STATUS.set_status(_("Tool calls requested: {count}").format(count=len(tool_calls_ns)), busy=False)
                 tool_calls = [
                     {
                         "id": tc.id,
@@ -258,8 +258,8 @@ class GepettoCLI(ida_kernwin.cli_t):
                     msg["parts"] = gemini_parts
                 MESSAGES.append(msg)
                 for tc in tool_calls_ns:
-                    STATUS.log(f"→ Tool: {tc.function.name}({(tc.function.arguments or '')[:120]}...)")
-                    STATUS.set_status(f"Running tool: {tc.function.name}", busy=True)
+                    STATUS.log(_("→ Tool: {tool_name}({tool_args}...)").format(tool_name=tc.function.name, tool_args=(tc.function.arguments or '')[:120]))
+                    STATUS.set_status(_("Running tool: {tool_name}").format(tool_name=tc.function.name), busy=True)
                     if tc.function.name == "get_screen_ea":
                         gepetto.ida.tools.get_screen_ea.handle_get_screen_ea_tc(tc, MESSAGES)
                     elif tc.function.name == "get_ea":
@@ -415,7 +415,7 @@ class GepettoCLI(ida_kernwin.cli_t):
                 STATUS.end_stream()
                 if getattr(STATUS, "_stopped", False):
                     return
-                STATUS.set_status("Continuing after tools...", busy=True)
+                STATUS.set_status(_("Continuing after tools..."), busy=True)
                 stream_and_handle()
             else:
                 # Ensure the streaming line is finished before logging summary
@@ -430,7 +430,7 @@ class GepettoCLI(ida_kernwin.cli_t):
                         STATUS.end_stream()
                     except Exception:
                         pass
-                    STATUS.log(f"Thinking Summary: {reasoning_summary}")
+                    STATUS.log(_("Thinking Summary: {summary}").format(summary=reasoning_summary))
                 try:
                     STATUS.summary_stream_end()
                 except Exception:
@@ -441,7 +441,7 @@ class GepettoCLI(ida_kernwin.cli_t):
                 MESSAGES.append(final_msg)
                 STATUS.set_status("Done", busy=False)
                 STATUS.clear_reasoning()
-                STATUS.log("✔ Completed turn")
+                STATUS.log(_("✔ Completed turn"))
 
         def stream_and_handle():
             message = SimpleNamespace(content="", tool_calls=[])
@@ -570,8 +570,8 @@ class GepettoCLI(ida_kernwin.cli_t):
                     #     STATUS.summary_stream_start(model_name)
                     # except Exception:
                     #     pass
-                    STATUS.set_status("Reasoning...", busy=True)
-                    STATUS.set_reasoning("Reasoning")
+                    STATUS.set_status(_("Reasoning..."), busy=True)
+                    STATUS.set_reasoning(_("Reasoning"))
                     return
                 # OpenAI Responses: live reasoning UI updates
                 if isinstance(delta, dict):
@@ -655,7 +655,7 @@ class GepettoCLI(ida_kernwin.cli_t):
                 if isinstance(finish_reason, str) and finish_reason.startswith("error:"):
                     err = finish_reason.split(":", 1)[1] if ":" in finish_reason else finish_reason
                     print("\n")
-                    STATUS.set_status("Error", busy=False)
+                    STATUS.set_status(_("Error"), busy=False)
                     STATUS.end_stream()
                     STATUS.log(f"✖ {err}")
                     return
@@ -667,7 +667,7 @@ class GepettoCLI(ida_kernwin.cli_t):
                         pass
                     STATUS.set_status("Done", busy=False)
                     STATUS.end_stream()
-                    STATUS.log("✔ Completed turn")
+                    STATUS.log(_("✔ Completed turn"))
 
             # Optional debug: show outbound thought signatures across the full assistant history
             try:
@@ -700,9 +700,9 @@ class GepettoCLI(ida_kernwin.cli_t):
                                 turn_count += 1
                         last = turn_count  # overwritten until final assistant is reached
                     if total:
-                        STATUS.log(f"Sending thought signatures: total={total} across {assistants} assistant turns; last={last}; first={ (first_b64 or '')[:16] }…")
+                        STATUS.log(_("Sending thought signatures: total={total} across {assistants} assistant turns; last={last}; first={first_b64}…").format(total=total, assistants=assistants, last=last, first_b64=(first_b64 or '')[:16]))
                     else:
-                        STATUS.log("Sending thought signatures: total=0 (none across assistant history)")
+                        STATUS.log(_("Sending thought signatures: total=0 (none across assistant history)"))
             except Exception:
                 pass
 
@@ -743,6 +743,6 @@ def register_cli():
             STATUS.set_status("Idle", busy=False)
         except Exception as e:
             try:
-                print(f"Failed to set idle status in status panel: {e}")
+                print(_("Failed to set idle status in status panel: {error}").format(error=e))
             except Exception:
                 pass

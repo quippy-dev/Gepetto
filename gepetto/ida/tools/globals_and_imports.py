@@ -307,13 +307,13 @@ def get_global_variable_value_by_name(variable_name: str) -> str:
         if not run_on_main_thread(_do, write=False):
             if result["error"]:
                 raise ValueError(result["error"])
-            raise ValueError("Failed to execute on main thread")
+            raise ValueError(_("Failed to execute on main thread"))
         
         if result["error"]:
             raise ValueError(result["error"])
         return result["value"]
     except Exception as e:
-        raise ValueError(f"Global variable value retrieval failed: {str(e)}")
+        raise ValueError(_("Global variable value retrieval failed: {error}").format(error=str(e)))
 
 
 def get_global_variable_value_internal(ea: int) -> str:
@@ -389,12 +389,11 @@ def get_global_variable_value_internal(ea: int) -> str:
         except Exception as e:
             result["error"] = str(e)
             return 0
-    
-    # Use MFF_FAST for better compatibility
+        
     if not run_on_main_thread(_do, write=False):
         if result["error"]:
             raise ValueError(result["error"])
-        raise ValueError("Failed to execute on main thread")
+        raise ValueError(_("Failed to execute on main thread"))
     
     if result["error"]:
         raise ValueError(result["error"])

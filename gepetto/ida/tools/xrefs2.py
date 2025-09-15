@@ -71,7 +71,7 @@ def _func_info(ea: int):
 
 def get_xrefs_to_field(struct_name: str, field_name: str) -> dict:
     if not struct_name or not field_name:
-        raise ValueError("struct_name and field_name are required")
+        raise ValueError(_("struct_name and field_name are required"))
     out = {"ok": False}
 
     def _do():

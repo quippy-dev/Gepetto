@@ -23,14 +23,14 @@ def handle_patch_address_assembles_tc(tc, messages):
 def _patch_assemble(ea: int, assemble: str) -> int:
     ok, bytes_to_patch = idautils.Assemble(ea, assemble)
     if not ok:
-        raise ValueError(f"Failed to assemble instruction: {assemble}")
+        raise ValueError(_("Failed to assemble instruction: {assemble}").format(assemble=assemble))
     ida_bytes.patch_bytes(ea, bytes_to_patch)
     return len(bytes_to_patch)
 
 
 def patch_address_assembles(address: str, assembles: str) -> dict:
     if not assembles:
-        raise ValueError("assembles is required (semicolon separated)")
+        raise ValueError(_("assembles is required (semicolon separated)"))
     ea = parse_ea(address)
     touch_last_ea(ea)
     out = {"ok": False}
@@ -82,9 +82,9 @@ def handle_patch_force_fallthrough_tc(tc, messages):
 
 def patch_nop_instructions(address: str, count: int = 1) -> dict:
     if not address:
-        raise ValueError("address is required")
+        raise ValueError(_("address is required"))
     if count <= 0:
-        raise ValueError("count must be >= 1")
+        raise ValueError(_("count must be >= 1"))
     ea = parse_ea(address)
     touch_last_ea(ea)
     out = {"ok": False}
