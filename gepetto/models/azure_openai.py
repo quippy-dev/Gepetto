@@ -2,7 +2,7 @@ import httpx as _httpx
 
 import openai
 from azure.identity import InteractiveBrowserCredential, get_bearer_token_provider
-from gepetto.models.openai import GPT
+from gepetto.models.oai_responses_base import OAIResponsesAPI
 import gepetto.models.model_manager
 import gepetto.config
 
@@ -17,9 +17,7 @@ AZURE_OPENAI_MODELS = [
 ]
 
 
-class AzureOpenAI(GPT):
-    # Azure OpenAI supports the Responses API.
-    use_responses_api = True
+class AzureOpenAI(OAIResponsesAPI):
     API_VERSION = "2024-05-01-preview"
 
     @staticmethod
@@ -32,18 +30,20 @@ class AzureOpenAI(GPT):
 
     @staticmethod
     def is_configured_properly() -> bool:
-        # The plugin is configured properly if the resource URL is provided, otherwise it should not be shown.
         return bool(gepetto.config.get_config("AzureOpenAI", "BASE_URL", "AZURE_OPENAI_URL"))
 
     def __init__(self, model):
+        super().__init__(model)
         self.model = model
+
+    def _make_client(self) -> openai.AzureOpenAI:
         proxy = gepetto.config.get_config("Gepetto", "PROXY")
         base_url = gepetto.config.get_config("AzureOpenAI", "BASE_URL", "AZURE_OPENAI_URL")
         api_key = gepetto.config.get_config(
             "AzureOpenAI", "API_KEY", "AZURE_OPENAI_API_KEY")
 
         if api_key:
-            self.client = openai.AzureOpenAI(
+            return openai.AzureOpenAI(
                 azure_endpoint=base_url,
                 api_key=api_key,
                 api_version=self.API_VERSION,
@@ -52,12 +52,11 @@ class AzureOpenAI(GPT):
                 ) if proxy else None
             )
         else:
-            # Entra ID authentication
             token_provider = get_bearer_token_provider(
                 InteractiveBrowserCredential(),
                 "https://cognitiveservices.azure.com/.default"
             )
-            self.client = openai.AzureOpenAI(
+            return openai.AzureOpenAI(
                 azure_endpoint=base_url,
                 azure_ad_token_provider=token_provider,
                 api_version=self.API_VERSION,
@@ -65,6 +64,16 @@ class AzureOpenAI(GPT):
                     proxy=proxy,
                 ) if proxy else None
             )
+
+    def query_model(self, query, cb, stream=False, additional_model_options=None):
+        if additional_model_options is None:
+            additional_model_options = {}
+
+        if "tools" in additional_model_options:
+            from gepetto.ida.tools.schemas import get_tools_for_provider
+            additional_model_options["tools"] = get_tools_for_provider("oai_responses")
+
+        return self._query_via_responses(query, cb, stream, additional_model_options)
 
 
 gepetto.models.model_manager.register_model(AzureOpenAI)

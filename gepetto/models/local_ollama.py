@@ -1,11 +1,12 @@
 import functools
 import threading
+from types import SimpleNamespace
 
 import httpx as _httpx
 import ida_kernwin
 import ollama
 
-from gepetto.models.base import LanguageModel
+from gepetto.models.oai_chat_base import OAIChatAPI
 import gepetto.models.model_manager
 import gepetto.config
 
@@ -13,78 +14,62 @@ _ = gepetto.config._
 
 OLLAMA_MODELS = None
 
-def create_client(**kwargs):
-    host = gepetto.config.get_config("Ollama", "HOST", default="http://localhost:11434")
-    return ollama.Client(host=host, **kwargs)
-
-class Ollama(LanguageModel):
+class Ollama(OAIChatAPI):
     @staticmethod
     def get_menu_name() -> str:
         return "Ollama"
+
+    def _make_client(self) -> ollama.Client:
+        host = gepetto.config.get_config("Ollama", "HOST", None, "http://localhost:11434")
+        return ollama.Client(host=host)
 
     @staticmethod
     def supported_models():
         global OLLAMA_MODELS
         if OLLAMA_MODELS is None:
             try:
-                # User a shorter timeout to avoid hanging IDA at startup is the server is unreachable.
-                OLLAMA_MODELS = [m["model"] for m in create_client(timeout=2).list()["models"]]
+                host = gepetto.config.get_config("Ollama", "HOST", None, "http://localhost:11434")
+                client = ollama.Client(host=host, timeout=2)
+                OLLAMA_MODELS = [m["model"] for m in client.list()["models"]]
             except (_httpx.ConnectError, _httpx.ConnectTimeout, ollama.ResponseError, ConnectionError):
                 OLLAMA_MODELS = []
         return OLLAMA_MODELS
 
     @staticmethod
     def is_configured_properly() -> bool:
-        # The plugin is configured properly if it exposes any model.
         return len(Ollama.supported_models()) > 0
 
     def __str__(self):
         return self.model
 
     def __init__(self, model):
+        super().__init__(model)
         self.model = model
-        self.client = create_client()
-        # Cancellation primitives
-        import threading as _thr
-        self._cancel_lock = _thr.Lock()
-        self._cancel_ev: _thr.Event | None = None
-        self._active_response = None
 
-    def query_model_async(self, query, cb, stream=False, additional_model_options = None):
-        if additional_model_options is None:
-            additional_model_options = {}
-        t = threading.Thread(target=self.query_model, args=[query, cb, stream, additional_model_options])
-        t.start()
-
-    def query_model(self, query, cb, stream=False, additional_model_options=None):
-        # Convert the OpenAI json parameter for Ollama
+    def _query_via_chat_completions(self, conversation, cb, stream, additional_model_options):
         kwargs = {}
         if "response_format" in additional_model_options and additional_model_options["response_format"]["type"] == "json_object":
             kwargs["format"] = "json"
 
-        try:
-            if type(query) is str:
-                conversation = [
-                    {"role": "user", "content": query}
-                ]
-            else:
-                conversation = query
+        opts = dict(additional_model_options or {})
+        opts.pop("tools", None)
 
+        try:
             response = self.client.chat(model=self.model,
                                         messages=conversation,
                                         stream=stream,
+                                        options=opts,
                                         **kwargs)
             if not stream:
-                ida_kernwin.execute_sync(functools.partial(cb, response=response["message"]["content"]),
-                                         ida_kernwin.MFF_WRITE)
+                pseudo = SimpleNamespace(output=[{"type": "output_text", "content": [{"text": response["message"]["content"]}]}])
+                cb(response=pseudo)
             else:
-                # Initialize/record cancel state for this request
                 with self._cancel_lock:
-                    import threading as _thr
-                    self._cancel_ev = getattr(self, "_cancel_ev", None) or _thr.Event()
-                    self._active_response = response
+                    self._cancel_ev = getattr(self, "_cancel_ev", None) or threading.Event()
+                    self._active_stream_ctx = response
+
+                text_buf = []
                 for chunk in response:
-                    # Cancellation check
                     if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
                         try:
                             close = getattr(response, "close", None)
@@ -93,29 +78,24 @@ class Ollama(LanguageModel):
                         except Exception:
                             pass
                         with self._cancel_lock:
-                            self._active_response = None
+                            self._active_stream_ctx = None
                         break
-                    cb(chunk['message']['content'], finished=chunk['done'])
+
+                    dtext = chunk['message']['content']
+                    text_buf.append(dtext)
+                    cb(dtext, None)
+
+                if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
+                    with self._cancel_lock:
+                        self._active_stream_ctx = None
+                    return
+
+                final_text = "".join(text_buf)
+                pseudo = SimpleNamespace(output=[{"type": "output_text", "content": [{"text": final_text}]}])
+                cb(response=pseudo)
+                with self._cancel_lock:
+                    self._active_stream_ctx = None
         except Exception as e:
             print(e)
-
-
-    def cancel_current_request(self):
-        """Signal cancellation to any in‑flight streaming request."""
-        try:
-            with self._cancel_lock:
-                ev = getattr(self, "_cancel_ev", None)
-                resp = getattr(self, "_active_response", None)
-                if ev is not None:
-                    ev.set()
-                if resp is not None:
-                    try:
-                        close = getattr(resp, "close", None)
-                        if callable(close):
-                            close()
-                    except Exception:
-                        pass
-        except Exception:
-            pass
 
 gepetto.models.model_manager.register_model(Ollama)

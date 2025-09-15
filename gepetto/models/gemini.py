@@ -10,6 +10,7 @@ from google.genai import types
 from gepetto.models.base import LanguageModel
 import gepetto.models.model_manager
 import gepetto.config
+from gepetto.ida.tools.schemas import get_tools_for_provider
 
 _ = gepetto.config._
 
@@ -66,99 +67,10 @@ def _convert_messages(messages):
                 )
             gemini_messages.append({"role": "model", "parts": parts})
         elif role == "tool":
-            # Build a FunctionResponse payload per google-genai expectations
-            # response must be an object with a 'content' list of parts
-            tool_name = _get(m, "name", "")
-            tool_id = _get(m, "tool_call_id", "") or _get(m, "id", "")
-            try:
-                parsed = json.loads(content)
-            except Exception:
-                parsed = content
+            # This is now handled by the gemini_bridge
+            pass
 
-            # Gemini often expects: { name: <tool>, content: [{text: <json-or-text>}] }
-            if isinstance(parsed, dict) and "content" in parsed:
-                response_obj = parsed
-            else:
-                if isinstance(parsed, (dict, list)):
-                    txt = json.dumps(parsed, ensure_ascii=False)
-                else:
-                    txt = str(parsed)
-                response_obj = {
-                    "name": tool_name,
-                    "content": [{"text": txt}],
-                }
-
-            gemini_messages.append(
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "function_response": {
-                                "name": tool_name,
-                                "id": tool_id,
-                                "response": response_obj,
-                            }
-                        }
-                    ],
-                }
-            )
     return system_instruction, gemini_messages
-
-
-_ALLOWED_SCHEMA_KEYS = {
-    "type",
-    "format",
-    "description",
-    "enum",
-    "properties",
-    "required",
-    "items",
-}
-
-
-def _sanitize_schema(schema):
-    if isinstance(schema, dict):
-        cleaned = {}
-        for k, v in schema.items():
-            if k not in _ALLOWED_SCHEMA_KEYS:
-                continue
-            if k == "properties" and isinstance(v, dict):
-                props = {}
-                for pk, pv in v.items():
-                    sanitized = _sanitize_schema(pv)
-                    if sanitized:
-                        props[pk] = sanitized
-                if props:
-                    cleaned["properties"] = props
-                continue
-            if k == "items":
-                sanitized = _sanitize_schema(v)
-                if sanitized:
-                    cleaned["items"] = sanitized
-                continue
-            if k == "required" and isinstance(v, list):
-                cleaned["required"] = list(v)
-                continue
-            sanitized = _sanitize_schema(v)
-            if sanitized is not None:
-                cleaned[k] = sanitized
-        if "required" in cleaned:
-            if "properties" in cleaned:
-                cleaned["required"] = [r for r in cleaned["required"] if r in cleaned["properties"]]
-                if not cleaned["required"]:
-                    cleaned.pop("required")
-            else:
-                cleaned.pop("required")
-        return cleaned or None
-    if isinstance(schema, list):
-        sanitized_list = []
-        for v in schema:
-            sanitized = _sanitize_schema(v)
-            if sanitized is not None:
-                sanitized_list.append(sanitized)
-        return sanitized_list or None
-    return schema
-
 
 def _to_serializable(value):
     if isinstance(value, dict):
@@ -166,52 +78,6 @@ def _to_serializable(value):
     if isinstance(value, list):
         return [_to_serializable(v) for v in value]
     return value
-
-
-def _convert_tools(tools):
-    """Convert our tool schema to Gemini `tools` list.
-
-    Supports function tools and allows callers to pass native Gemini tools
-    (e.g., {"google_search": {}}, {"code_execution": {}}, {"url_context": {}})
-    alongside function declarations.
-    """
-    function_decls = []
-    for t in tools or []:
-        # Function tools (Chat Completions or Responses style)
-        if _get(t, "type") != "function":
-            continue
-        # Accept both Chat Completions-style ({type:function, function:{...}})
-        # and Responses-style ({type:function, name:"...", parameters:{...}})
-        fn = _get(t, "function")
-        if fn is not None:
-            name = _get(fn, "name", "")
-            desc = _get(fn, "description")
-            params = _get(fn, "parameters")
-        else:
-            name = _get(t, "name", "")
-            desc = _get(t, "description")
-            params = _get(t, "parameters")
-        if params:
-            params = _sanitize_schema(params)
-        try:
-            function_decls.append(
-                types.FunctionDeclaration(
-                    name=name,
-                    description=desc,
-                    parameters=params,
-                )
-            )
-        except Exception:
-            # Fallback simple dict; the client may coerce this as needed
-            function_decls.append({
-                "name": name,
-                "description": desc,
-                "parameters": params,
-            })
-    if function_decls:
-        return [types.Tool(function_declarations=function_decls)]
-    return None
-
 
 class Gemini(LanguageModel):
     @staticmethod
@@ -276,7 +142,8 @@ class Gemini(LanguageModel):
 
         tools = None
         if "tools" in additional_model_options:
-            tools = _convert_tools(additional_model_options.pop("tools"))
+            tools = get_tools_for_provider("gemini")
+            del additional_model_options["tools"]
 
         safety_settings = [
             types.SafetySetting(
@@ -297,15 +164,11 @@ class Gemini(LanguageModel):
             ),
         ]
 
-        # Enable Gemini "thinking" stream so we can display reasoning steps.
-        # Latest docs recommend ThinkingConfig(include_thoughts=True) for
-        # rolling, incremental summaries during generation.
         try:
             thinking_cfg = types.ThinkingConfig(include_thoughts=True)
         except Exception:
             thinking_cfg = None
 
-        # Avoid duplicate keys from additional options
         additional_opts = dict(additional_model_options or {})
         additional_opts.pop("tools", None)
 
@@ -325,20 +188,17 @@ class Gemini(LanguageModel):
                     contents=messages,
                     config=config,
                 )
-                # Initialize/record cancel state for this request
                 with self._cancel_lock:
                     import threading as _thr
                     self._cancel_ev = getattr(self, "_cancel_ev", None) or _thr.Event()
                     self._active_stream = response_stream
 
-                # Accumulate tool calls across chunks to assign stable indices
                 tool_idx_by_id: dict[str, int] = {}
                 next_tool_index = 0
                 pending_tool_calls: list = []
                 saw_function_call = False
                 text_buf: list[str] = []
                 thought_buf: list[str] = []
-                # Preserve original SDK part objects to keep thought_signature bytes intact
                 raw_parts: list = []
                 sent_reasoning_done = False
 
@@ -361,7 +221,6 @@ class Gemini(LanguageModel):
                     call = next(tc for tc in pending_tool_calls if tc.index == idx)
                     name = _get(fc_obj, "name", "") or ""
                     args = _to_serializable(_get(fc_obj, "args", {})) or {}
-                    # Assign full values (avoid incremental duplication)
                     call.function.name = name
                     try:
                         call.function.arguments = json.dumps(args)
@@ -370,7 +229,6 @@ class Gemini(LanguageModel):
 
                 sent_final = False
                 for chunk in response_stream:
-                    # Cancellation check
                     if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
                         try:
                             close = getattr(response_stream, "close", None)
@@ -387,18 +245,14 @@ class Gemini(LanguageModel):
                     finalize_on_function_call = False
                     for part in parts:
                         if getattr(part, "text", None):
-                            # If this part carries Gemini thoughts, stream as reasoning summary
                             if getattr(part, "thought", False):
                                 t = part.text or ""
-                                t = t.rstrip("\r\n")  # avoid extra blank lines at end
+                                t = t.rstrip("\r\n")
                                 if t:
                                     cb({"reasoning_summary_text_delta": t}, None)
                                     thought_buf.append(t)
-                                    # Keep the raw part with signature
                                     raw_parts.append(part)
                             else:
-                                # If normal text begins while we were still streaming thoughts,
-                                # close the reasoning summary first to avoid interleaving.
                                 if thought_buf and not sent_reasoning_done:
                                     try:
                                         cb({"reasoning_summary_done": "".join(thought_buf).rstrip("\r\n")}, None)
@@ -413,7 +267,6 @@ class Gemini(LanguageModel):
                             raw_parts.append(part)
                             finalize_on_function_call = True
 
-                    # If the model requested a tool call, finalize immediately; many backends pause here
                     if finalize_on_function_call and not sent_final:
                         output = []
                         final_text = "".join(text_buf)
@@ -456,7 +309,6 @@ class Gemini(LanguageModel):
 
                     fr = chunk.candidates[0].finish_reason if chunk.candidates else None
                     if fr and getattr(types.FinishReason, "FINISH_REASON_UNSPECIFIED", None) is not None and fr != types.FinishReason.FINISH_REASON_UNSPECIFIED:
-                        # Build a Responses-like final object so CLI can extract tool calls
                         output = []
                         final_text = "".join(text_buf)
                         if final_text:
@@ -464,7 +316,6 @@ class Gemini(LanguageModel):
                                 "type": "output_text",
                                 "content": [{"text": final_text}],
                             })
-                        # Emit reasoning summary done and include final summary in the object
                         final_thoughts = "".join(thought_buf).rstrip("\r\n")
                         if final_thoughts:
                             try:
@@ -482,14 +333,13 @@ class Gemini(LanguageModel):
                                 "name": getattr(tc.function, "name", ""),
                                 "arguments": getattr(tc.function, "arguments", ""),
                             })
-                        # Skip delivering final output if canceled
                         if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
                             with self._cancel_lock:
                                 self._active_stream = None
                             return
                         cb(response=SimpleNamespace(output=output, gemini_parts=raw_parts, parts=raw_parts))
                         sent_final = True
-                # If the stream ended without an explicit finish_reason, flush what we have
+
                 if not sent_final and (saw_function_call or text_buf or thought_buf or pending_tool_calls):
                     output = []
                     final_text = "".join(text_buf)
@@ -516,7 +366,6 @@ class Gemini(LanguageModel):
                             "name": getattr(tc.function, "name", ""),
                             "arguments": getattr(tc.function, "arguments", ""),
                         })
-                    # Skip delivering final output if canceled
                     if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
                         with self._cancel_lock:
                             self._active_stream = None
@@ -561,7 +410,6 @@ class Gemini(LanguageModel):
                         raw_parts.append(part)
 
                 if stream:
-                    # Adapt to streaming-like callbacks: emit text deltas, then final response
                     if message.content:
                         cb(message.content, None)
                     if final_thoughts:
@@ -587,7 +435,6 @@ class Gemini(LanguageModel):
                         })
                     cb(response=SimpleNamespace(output=output, gemini_parts=raw_parts, parts=raw_parts))
                 else:
-                    # Non-streaming: deliver a final Responses-like object directly
                     output = []
                     if message.content:
                         output.append({
@@ -609,7 +456,6 @@ class Gemini(LanguageModel):
                     cb(response=SimpleNamespace(output=output, gemini_parts=raw_parts, parts=raw_parts))
 
         except Exception as e:
-            # Suppress network/stream errors if the request was cancelled
             try:
                 if getattr(self, "_cancel_ev", None) is not None and self._cancel_ev.is_set():
                     with self._cancel_lock:

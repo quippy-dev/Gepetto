@@ -25,7 +25,7 @@ class GeminiSchemaTests(unittest.TestCase):
             "ida_kernwin",
             SimpleNamespace(execute_sync=lambda *a, **k: None, MFF_WRITE=0),
         )
-        from gepetto.models.gemini import _sanitize_schema
+        from gepetto.ida.tools.schemas.gemini_tools import _sanitize_schema
 
         schema = {
             "type": "object",
@@ -48,7 +48,7 @@ class GeminiSchemaTests(unittest.TestCase):
             "ida_kernwin",
             SimpleNamespace(execute_sync=lambda *a, **k: None, MFF_WRITE=0),
         )
-        from gepetto.models.gemini import _sanitize_schema
+        from gepetto.ida.tools.schemas.gemini_tools import _sanitize_schema
 
         schema = {
             "type": "object",

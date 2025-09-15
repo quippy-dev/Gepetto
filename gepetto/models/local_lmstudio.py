@@ -1,5 +1,5 @@
 import httpx as _httpx
-from gepetto.models.openai import GPT
+from gepetto.models.oai_chat_base import OAIChatAPI
 import openai
 
 import gepetto.models.model_manager
@@ -9,7 +9,7 @@ _ = gepetto.config._
 
 LMSTUDIO_MODELS = None
 
-class LMStudio(GPT):
+class LMStudio(OAIChatAPI):
     @staticmethod
     def get_menu_name() -> str:
         return "LM Studio"
@@ -21,7 +21,7 @@ class LMStudio(GPT):
         if LMSTUDIO_MODELS is not None:
             return LMSTUDIO_MODELS
 
-        base_url = gepetto.config.get_config("LMStudio", "BASE_URL", default="http://127.0.0.1:1234/v1/")
+        base_url = gepetto.config.get_config("LMStudio", "BASE_URL", None, "http://127.0.0.1:1234/v1/")
         try:
             response = _httpx.get(f"{base_url}models", timeout=2)
             if response.status_code == 200:
@@ -42,16 +42,14 @@ class LMStudio(GPT):
         return len(LMStudio.supported_models()) > 0
 
     def __init__(self, model):
-        try:
-            super().__init__(model)
-        except ValueError:
-            pass
+        super().__init__(model)
+        self.model = model
 
-        base_url = gepetto.config.get_config("LMStudio", "BASE_URL", default="http://127.0.0.1:1234/v1/")
+    def _make_client(self) -> openai.OpenAI:
+        base_url = gepetto.config.get_config("LMStudio", "BASE_URL", None, "http://127.0.0.1:1234/v1/")
         proxy = gepetto.config.get_config("Gepetto", "PROXY")
 
-        self.model = model
-        self.client = openai.OpenAI(
+        return openai.OpenAI(
             api_key="NO_API_KEY",
             base_url=base_url,
             http_client=_httpx.Client(
@@ -59,7 +57,7 @@ class LMStudio(GPT):
             ) if proxy else None
         )
 
-    def query_model(self, query, cb, additional_model_options=None):
+    def query_model_async(self, query, cb, stream=False, additional_model_options=None):
         if additional_model_options is not None and additional_model_options.get("response_format", {}).get("type") == "json_object":
             additional_model_options.update({
                 "response_format": {
@@ -74,8 +72,10 @@ class LMStudio(GPT):
         else:
             additional_model_options = {}
 
-        super().query_model(query, cb, additional_model_options)
+        if "tools" in additional_model_options:
+            from gepetto.ida.tools.schemas import get_tools_for_provider
+            additional_model_options["tools"] = get_tools_for_provider("oai_chat")
 
-    # -----------------------------------------------------------------------------
+        super().query_model_async(query, cb, stream, additional_model_options)
 
 gepetto.models.model_manager.register_model(LMStudio)
