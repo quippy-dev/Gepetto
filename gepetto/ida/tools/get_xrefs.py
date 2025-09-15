@@ -13,6 +13,10 @@ from gepetto.ida.tools.function_utils import resolve_ea, resolve_func, get_func_
 from gepetto.ida.utils.ida9_utils import touch_last_ea
 from gepetto.ida.tools.tools import add_result_to_messages
 
+import gepetto.config
+
+_ = gepetto.config._
+
 def handle_get_xrefs_tc(tc, messages):
     """Handle a tool call to fetch cross-references (EA/function/name)."""
     try:
@@ -127,9 +131,9 @@ def get_xrefs_unified(
     direction: "to" | "from" | "both"
     """
     if direction not in {"to","from","both"}:
-        raise ValueError("direction must be 'to'|'from'|'both'")
+        raise ValueError(_("direction must be 'to'|'from'|'both'"))
     if scope not in {"ea","function","name"}:
-        raise ValueError("scope must be 'ea'|'function'|'name'")
+        raise ValueError(_("scope must be 'ea'|'function'|'name'"))
 
     out = {"ok": False, "scope": scope, "subject": {}, "direction": direction, "filters": {}, "xrefs": [], "stats": {}}
 

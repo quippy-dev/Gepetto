@@ -2,6 +2,9 @@ import idaapi
 import ida_funcs
 import ida_kernwin
 import ida_name
+import gepetto.config
+
+_ = gepetto.config._
 
 # Import from our new ida9_utils module
 from gepetto.ida.utils.ida9_utils import (
@@ -17,7 +20,7 @@ def resolve_ea(name) -> int:
         try:
             ne = ida_name.get_name_ea(idaapi.BADADDR, name)
             if ne == idaapi.BADADDR:
-                out["err"] = f"Name not found: {name!r}"
+                out["err"] = _("Name not found: {name!r}").format(name=name)
                 return 0
             out["ea"] = int(ne)
             touch_last_ea(ne)  # Track resolved EA
@@ -28,7 +31,7 @@ def resolve_ea(name) -> int:
 
     run_on_main_thread(_do, write=False)
     if out["ea"] is None:
-        raise ValueError(out["err"] or "Failed to resolve EA")
+        raise ValueError(out["err"] or _("Failed to resolve EA"))
     return out["ea"]
 
 
@@ -41,18 +44,18 @@ def resolve_func(ea=None, name=None):
             if name:
                 name_ea = ida_name.get_name_ea(idaapi.BADADDR, name)
                 if name_ea == idaapi.BADADDR:
-                    out["err"] = f"Name not found: {name!r}"
+                    out["err"] = _("Name not found: {name!r}").format(name=name)
                     return 0
                 f = ida_funcs.get_func(name_ea)
                 if not f:
-                    out["err"] = f"Symbol {name!r} not inside a function."
+                    out["err"] = _("Symbol {name!r} not inside a function.").format(name=name)
                     return 0
                 out["func"] = f
                 touch_last_ea(name_ea)  # Track resolved EA
                 return 1
             f = ida_funcs.get_func(ea)
             if not f:
-                out["err"] = f"EA {ea_to_hex(ea)} is not inside a function."
+                out["err"] = _("EA 0x{ea:X} is not inside a function.").format(ea=ea)
                 return 0
             out["func"] = f
             touch_last_ea(ea)  # Track used EA
@@ -62,7 +65,7 @@ def resolve_func(ea=None, name=None):
 
     run_on_main_thread(_do, write=False)
     if not out["func"]:
-        raise ValueError(out["err"] or "Failed to resolve function")
+        raise ValueError(out["err"] or _("Failed to resolve function"))
     return out["func"]
 
 

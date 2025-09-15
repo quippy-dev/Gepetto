@@ -6,10 +6,13 @@ from typing import Optional
 
 import ida_name
 import ida_kernwin
+import gepetto.config
 
 from gepetto.ida.utils.ida9_utils import parse_ea, run_on_main_thread, touch_last_ea
 from gepetto.ida.tools.function_utils import resolve_ea, resolve_func, get_func_name
 from gepetto.ida.tools.tools import add_result_to_messages
+
+_ = gepetto.config._
 
 
 def handle_rename_function_tc(tc, messages):
@@ -42,7 +45,7 @@ def rename_function(
 ) -> dict:
     """Rename a function by EA or name."""
     if not new_name:
-        raise ValueError("new_name is required")
+        raise ValueError(_("new_name is required"))
 
     f = resolve_func(ea=ea, name=name)
     old_name = name or get_func_name(f)
@@ -54,7 +57,7 @@ def rename_function(
     def _do():
         try:
             if not ida_name.set_name(ea, new_name):
-                out["error"] = f"Failed to rename function {old_name!r}"
+                out["error"] = _("Failed to rename function {old_name!r}").format(old_name=old_name)
                 return 0
             out["ok"] = True
             return 1
@@ -67,5 +70,5 @@ def rename_function(
             out["error"] = "Failed to execute on main thread"
 
     if not out["ok"]:
-        raise ValueError(out.get("error", "Failed to rename function"))
+        raise ValueError(out.get("error", _("Failed to rename function")))
     return out

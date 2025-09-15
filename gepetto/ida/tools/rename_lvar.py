@@ -7,10 +7,13 @@ import ida_frame
 import ida_typeinf
 import ida_funcs
 import idaapi
+import gepetto.config
 
 from gepetto.ida.utils.ida9_utils import parse_ea
 from gepetto.ida.tools.function_utils import resolve_ea, resolve_func, get_func_name
 from gepetto.ida.tools.tools import add_result_to_messages
+
+_ = gepetto.config._
 from gepetto.ida.utils.ida9_utils import hexrays_available, decompile_func, run_on_main_thread, touch_last_ea
 
 
@@ -47,7 +50,7 @@ def rename_lvar(
 ) -> dict:
     """Rename a local (stack frame) variable by updating the frame member name."""
     if not old_name or not new_name:
-        raise ValueError("old_name and new_name are required")
+        raise ValueError(_("old_name and new_name are required"))
 
     if ea is not None:
         ea = parse_ea(ea)
@@ -64,21 +67,21 @@ def rename_lvar(
             # Use ida_typeinf/ida_frame in IDA 9.x
             frame_tif = ida_typeinf.tinfo_t()
             if not ida_frame.get_func_frame(frame_tif, f):
-                out["error"] = "Function frame not found."
+                out["error"] = _("Function frame not found for {func_name}").format(func_name=func_name)
                 return 0
             idx, udm = frame_tif.get_udm(old_name)
             if not udm:
-                out["error"] = f"Local variable {old_name!r} not found in frame"
+                out["error"] = _("Local variable {old_name!r} not found in frame").format(old_name=old_name)
                 return 0
             tid = frame_tif.get_udm_tid(idx)
             if ida_frame.is_special_frame_member(tid):
-                out["error"] = f"'{old_name}' is a special frame member and cannot be renamed."
+                out["error"] = _("'{old_name}' is a special frame member and cannot be renamed.").format(old_name=old_name)
                 return 0
             udm2 = ida_typeinf.udm_t()
             frame_tif.get_udm_by_tid(udm2, tid)
             offset = udm2.offset // 8
             if ida_frame.is_funcarg_off(f, offset):
-                out["error"] = f"'{old_name}' is an argument member and cannot be renamed."
+                out["error"] = _("'{old_name}' is an argument member and cannot be renamed.").format(old_name=old_name)
                 return 0
             try:
                 rc = frame_tif.rename_udm(idx, new_name)
@@ -86,7 +89,7 @@ def rename_lvar(
             except Exception:
                 ok = False
             if not ok:
-                out["error"] = f"Failed to rename lvar {old_name!r}"
+                out["error"] = _("Failed to rename lvar {old_name!r}").format(old_name=old_name)
                 return 0
             out["ok"] = True
             return 1
@@ -99,5 +102,5 @@ def rename_lvar(
             out["error"] = "Failed to execute on main thread"
 
     if not out["ok"]:
-        raise ValueError(out.get("error", "Failed to rename lvar"))
+        raise ValueError(out.get("error", _("Failed to rename lvar")))
     return out
